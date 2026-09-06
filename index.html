@@ -595,8 +595,8 @@
       </div>
       <h2 class="confirmation-title">You're all set, <span id="confirm-name">there</span>.</h2>
       <div class="confirmation-echo hidden" id="confirm-echo"></div>
-      <p class="confirmation-followup">Vincent or Jane will be in touch personally —<br>usually within a few hours.</p>
-      <p class="confirmation-callnote">Watch for a call from a (610) number — that's us.</p>
+      <p class="confirmation-followup" id="confirm-followup">Vincent or Jane will be in touch personally —<br>usually within a few hours.</p>
+      <p class="confirmation-callnote" id="confirm-callnote">Watch for a call from a (610) number — that's us.</p>
     </div>
   </div>
 
@@ -1361,6 +1361,13 @@ function showConfirmation(response) {
   // Confirmation card
   if (confirmedName) {
     document.getElementById('confirm-name').textContent = confirmedName;
+
+    if (STATE.contactOptedOut) {
+      document.getElementById('confirm-followup').innerHTML =
+        'We have what you shared — no contact info needed on your end.';
+      document.getElementById('confirm-callnote').textContent =
+        'If you change your mind, you can always reach us directly at (484) 259-7910.';
+    }
   }
 
   // Echo back the first sentence of the paragraph
