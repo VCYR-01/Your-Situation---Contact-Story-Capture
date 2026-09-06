@@ -705,6 +705,21 @@ if (confirmedName) {
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
+// iOS Safari requires speech synthesis to be triggered by a direct user
+// gesture at least once per session — later async-triggered speech (after
+// the Claude response comes back) won't play otherwise. A near-silent
+// zero-length utterance here "unlocks" audio for everything spoken later.
+function unlockTTS() {
+  if (window.speechSynthesis && !window.__ttsUnlocked) {
+    try {
+      const unlock = new SpeechSynthesisUtterance('');
+      unlock.volume = 0;
+      window.speechSynthesis.speak(unlock);
+      window.__ttsUnlocked = true;
+    } catch (e) { /* non-fatal — speech just won't work on this device */ }
+  }
+}
+
 class MicHandler {
   constructor(micBtn, micStatus, transcriptBox, onTranscriptChange, hintEl) {
     this.micBtn = micBtn;
@@ -784,6 +799,7 @@ class MicHandler {
     };
 
     this.micBtn.addEventListener('click', () => {
+      unlockTTS();
       if (this.isRecording) {
         this.recognition.stop();
         this.stop();
@@ -1016,6 +1032,7 @@ const micInitial = new MicHandler(
 );
 
 document.getElementById('type-toggle-initial').addEventListener('click', () => {
+  unlockTTS();
   const tb = document.getElementById('transcript-initial');
   tb.classList.remove('hidden');
   tb.focus();
@@ -1090,13 +1107,17 @@ if (window.speechSynthesis) {
   window.speechSynthesis.onvoiceschanged = () => { ttsVoice = pickFemaleVoice(); };
 }
 
-function speakText(text) {
-  if (!window.speechSynthesis || ttsMuted || !text) return;
+function speakText(text, onEnd) {
+  if (!window.speechSynthesis || ttsMuted || !text) {
+    if (onEnd) onEnd();
+    return;
+  }
   window.speechSynthesis.cancel(); // stop anything already playing
   const utterance = new SpeechSynthesisUtterance(text);
   if (ttsVoice) utterance.voice = ttsVoice;
   utterance.rate = 1.0;
   utterance.pitch = 1.0;
+  if (onEnd) utterance.onend = onEnd;
   window.speechSynthesis.speak(utterance);
 }
 
@@ -1112,9 +1133,14 @@ if (muteBtn) {
 
 function showPlayback(response) {
   document.getElementById('paragraph-playback').textContent = response.paragraph || '';
-  document.getElementById('permission-ask').textContent =
-    response.permission_ask || 'Mind if I ask one more thing before we hand off, or are you good?';
-  speakText(response.paragraph || '');
+  const permissionText = response.permission_ask || 'Mind if I ask one more thing before we hand off, or are you good?';
+  document.getElementById('permission-ask').textContent = permissionText;
+  // Speak the paragraph, then the follow-up question once it genuinely
+  // finishes (not a guessed delay) — a brief pause between them so it
+  // doesn't read as one unbroken sentence.
+  speakText(response.paragraph || '', () => {
+    setTimeout(() => speakText(permissionText), 400);
+  });
   showStage('PLAYBACK');
 }
 
@@ -1221,6 +1247,7 @@ function unlockProbeButtonAfterDelay() {
 }
 
 document.getElementById('type-toggle-probe').addEventListener('click', () => {
+  unlockTTS();
   const tb = document.getElementById('transcript-probe');
   tb.classList.remove('hidden');
   tb.focus();
@@ -1417,13 +1444,31 @@ function showConfirmation(response) {
 
   // Echo back the first sentence of the paragraph
   const paragraph = response && typeof response === 'object' ? (response.paragraph || '') : '';
+  let echoText = '';
   if (paragraph && paragraph.length > 0) {
     const echo = document.getElementById('confirm-echo');
     const firstSentence = paragraph.split(/(?<=[.!?])\s+/)[0] || paragraph;
-    echo.textContent = '"' + firstSentence.slice(0, 240) + (firstSentence.length > 240 ? '…' : '') + '"';
+    echoText = firstSentence.slice(0, 240) + (firstSentence.length > 240 ? '…' : '');
+    echo.textContent = '"' + echoText + '"';
     echo.classList.remove('hidden');
   }
   document.getElementById('card-confirmation').classList.remove('hidden');
+
+  // Speak the confirmation sequence: name greeting, then the echoed
+  // excerpt, then the followup message — each chained off the previous
+  // one actually finishing, not a guessed delay. Reads the followup text
+  // directly from the DOM rather than recomputing it, so it can't drift
+  // out of sync with whatever was actually set above (normal or opt-out).
+  const followupEl = document.getElementById('confirm-followup');
+  const followupText = followupEl ? followupEl.textContent.trim() : '';
+  const nameGreeting = confirmedName ? ("You're all set, " + confirmedName + ".") : "You're all set.";
+  speakText(nameGreeting, () => {
+    setTimeout(() => {
+      speakText(echoText, () => {
+        setTimeout(() => speakText(followupText), 400);
+      });
+    }, 400);
+  });
 
   // V3: Visitor briefing
   const visitorBriefing = response && response.visitor_briefing ? String(response.visitor_briefing).trim() : '';
