@@ -529,6 +529,7 @@
   <div class="card hidden" id="card-playback">
     <div class="card-label" id="playback-label">Here's what I'm hearing</div>
     <div class="paragraph-box" id="paragraph-playback"></div>
+    <button id="btn-mute-toggle" style="background:none; border:none; color:var(--accent); font-size:12px; font-family:var(--mono); cursor:pointer; text-decoration:underline; padding:0; margin-top:6px;" aria-label="Mute audio">🔊 Mute</button>
     <div class="permission-ask" id="permission-ask"></div>
     <div class="button-row" id="playback-actions">
       <button class="btn btn-primary" id="btn-permission-yes">Sure, ask</button>
@@ -1058,10 +1059,62 @@ async function processRound1() {
   }
 }
 
+// ---- SPEECH SYNTHESIS: reads the paragraph playback aloud ----
+// Uses the browser's built-in speechSynthesis — no API, no cost, no server
+// call. Voice availability varies by device/OS; this picks the best female-
+// sounding option from whatever the visitor's browser actually has installed,
+// falling back gracefully if none match.
+let ttsMuted = false;
+let ttsVoice = null;
+
+function pickFemaleVoice() {
+  const voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+  if (!voices.length) return null;
+  // Common female-voice names across platforms — checked in rough
+  // quality-preference order. Falls back to anything flagged female-ish
+  // by name pattern, then to the first available English voice, then null.
+  const preferredNames = ['Samantha', 'Google US English Female', 'Microsoft Zira', 'Victoria', 'Karen', 'Moira', 'Google UK English Female'];
+  for (const name of preferredNames) {
+    const match = voices.find(v => v.name.includes(name));
+    if (match) return match;
+  }
+  const looksFemale = voices.find(v => /female/i.test(v.name) && /en/i.test(v.lang));
+  if (looksFemale) return looksFemale;
+  const anyEnglish = voices.find(v => /^en/i.test(v.lang));
+  return anyEnglish || voices[0];
+}
+
+// Voice list loads asynchronously on some browsers — refresh the pick once ready.
+if (window.speechSynthesis) {
+  ttsVoice = pickFemaleVoice();
+  window.speechSynthesis.onvoiceschanged = () => { ttsVoice = pickFemaleVoice(); };
+}
+
+function speakText(text) {
+  if (!window.speechSynthesis || ttsMuted || !text) return;
+  window.speechSynthesis.cancel(); // stop anything already playing
+  const utterance = new SpeechSynthesisUtterance(text);
+  if (ttsVoice) utterance.voice = ttsVoice;
+  utterance.rate = 1.0;
+  utterance.pitch = 1.0;
+  window.speechSynthesis.speak(utterance);
+}
+
+const muteBtn = document.getElementById('btn-mute-toggle');
+if (muteBtn) {
+  muteBtn.addEventListener('click', () => {
+    ttsMuted = !ttsMuted;
+    muteBtn.textContent = ttsMuted ? '🔇 Unmute' : '🔊 Mute';
+    if (ttsMuted && window.speechSynthesis) window.speechSynthesis.cancel();
+  });
+}
+// ---- END SPEECH SYNTHESIS ----
+
 function showPlayback(response) {
   document.getElementById('paragraph-playback').textContent = response.paragraph || '';
   document.getElementById('permission-ask').textContent =
     response.permission_ask || 'Mind if I ask one more thing before we hand off, or are you good?';
+  speakText(response.paragraph || '');
   showStage('PLAYBACK');
 }
 
