@@ -660,6 +660,7 @@ const STATE = {
 // URL params
 const params = new URLSearchParams(window.location.search);
 const confirmedName = params.get('name') ? decodeURIComponent(params.get('name')).trim() : null;
+const confirmedLastName = params.get('lastname') ? decodeURIComponent(params.get('lastname')).trim() : null;
 const confirmedPhone = params.get('phone') ? decodeURIComponent(params.get('phone')).trim() : null;
 const confirmedEmail = params.get('email') ? decodeURIComponent(params.get('email')).trim() : null;
 const confirmedScenario = params.get('scenario') ? decodeURIComponent(params.get('scenario')).trim() : null;
@@ -951,6 +952,7 @@ async function fireZapier(payload) {
 async function fireFallbackZapier(transcript) {
   const fallbackPayload = {
     name: confirmedName,
+    lastname: confirmedLastName,
     phone: STATE.contactPhone || confirmedPhone,
     email: STATE.contactEmail || confirmedEmail,
     scenario: confirmedScenario,
@@ -1278,6 +1280,7 @@ async function finalizeAndSubmit() {
     const payload = {
       // Form data
       name: confirmedName,
+      lastname: confirmedLastName,
       phone: STATE.contactPhone || confirmedPhone,
       email: STATE.contactEmail || confirmedEmail,
       scenario: confirmedScenario,

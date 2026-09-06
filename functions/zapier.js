@@ -47,12 +47,11 @@ const KEY_MAP = {
 function translatePayload(body) {
   const out = {};
 
-  // Split combined "name" into first/last, matching how the Zap's
-  // Create/Update Contact + Code-by-Zapier steps are actually mapped
-  const fullName = (body.name || '').trim();
-  const spaceIdx = fullName.indexOf(' ');
-  out.visitorFirstName = spaceIdx === -1 ? fullName : fullName.slice(0, spaceIdx);
-  out.visitorLastName = spaceIdx === -1 ? '' : fullName.slice(spaceIdx + 1);
+  // Name and lastname now arrive as two genuinely separate fields (fixed at
+  // the WPCode redirect-URL source, which previously only captured first
+  // name). Pass both through directly — no splitting needed.
+  out.visitorFirstName = body.name || '';
+  out.visitorLastName = body.lastname || '';
 
   // Apply the rest of the key map, skipping 'name' (handled above)
   for (const [oldKey, newKey] of Object.entries(KEY_MAP)) {
