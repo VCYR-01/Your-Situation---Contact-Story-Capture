@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YourSituation — The Cyr Team</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1a18;
+    --ink-mid: #4a4a45;
+    --ink-light: #9a9a92;
+    --paper: #f7f5f0;
+    --paper-dark: #eeece6;
+    --accent: #2d5a3d;
+    --accent-light: #e8f0ea;
+    --warn: #c4500a;
+    --warn-light: #fdf0e8;
+    --radius: 10px;
+    --mono: 'DM Sans', sans-serif;
+    --serif: 'Playfair Display', serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--mono);
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 80px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  header h1 {
+    font-family: var(--serif);
+    font-size: clamp(28px, 5vw, 42px);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    margin-bottom: 8px;
+  }
+
+  header p {
+    font-size: 14px;
+    color: var(--ink-light);
+    font-weight: 300;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .greeting-banner {
+    background: var(--accent-light);
+    border: 1px solid #c2d9c8;
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .greeting-text {
+    font-size: 14px;
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .greeting-meta {
+    font-size: 11px;
+    color: var(--ink-light);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .workbench {
+    width: 100%;
+    max-width: 680px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .card {
+    background: white;
+    border: 1px solid var(--paper-dark);
+    border-radius: var(--radius);
+    padding: 28px;
+    transition: opacity 0.2s ease;
+  }
+
+  .card.fading { opacity: 0.5; }
+
+  .card-label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-light);
+    margin-bottom: 16px;
+  }
+
+  /* MIC SECTION */
+  .mic-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    padding: 12px 0;
+  }
+
+  .mic-btn {
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    background: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    position: relative;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mic-btn:hover { background: var(--accent-light); }
+
+  .mic-btn.recording {
+    background: var(--accent);
+    border-color: var(--accent);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  .mic-btn.recording svg path { fill: white; }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(45, 90, 61, 0.3); }
+    50% { box-shadow: 0 0 0 14px rgba(45, 90, 61, 0); }
+  }
+
+  .mic-btn svg { width: 32px; height: 32px; }
+  .mic-btn svg path { fill: var(--accent); transition: fill 0.2s; }
+
+  .mic-status {
+    font-size: 13px;
+    color: var(--ink-mid);
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    min-height: 20px;
+    text-align: center;
+  }
+
+  .mic-status.recording { color: var(--accent); font-weight: 500; }
+  .mic-status.error { color: var(--warn); }
+
+  /* TRANSCRIPT — visible during/after speech for reassurance */
+  .transcript-box {
+    width: 100%;
+    min-height: 80px;
+    background: var(--paper);
+    border: 1px solid var(--paper-dark);
+    border-radius: 8px;
+    padding: 16px;
+    font-size: 15px;
+    line-height: 1.65;
+    color: var(--ink);
+    font-family: var(--mono);
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s;
+    margin-top: 16px;
+  }
+
+  .transcript-box:focus { border-color: var(--accent); }
+
+  /* PARAGRAPH PLAYBACK */
+  .paragraph-box {
+    background: var(--accent-light);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+    padding: 18px 20px;
+    font-size: 16px;
+    line-height: 1.7;
+    color: var(--ink);
+    margin-bottom: 18px;
+  }
+
+  .paragraph-box.collapsed {
+    background: var(--paper);
+    border-left-color: var(--ink-light);
+    color: var(--ink-mid);
+    font-size: 14px;
+    padding: 14px 16px;
+  }
+
+  /* PERMISSION ASK */
+  .permission-ask {
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    margin-bottom: 18px;
+  }
+
+  /* PROBE */
+  .probe-card {
+    background: white;
+    border: 1px solid var(--paper-dark);
+    border-radius: var(--radius);
+    padding: 28px;
+  }
+
+  .probe-replying-to {
+    font-size: 12px;
+    color: var(--ink-light);
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+
+  .probe-question {
+    font-size: 17px;
+    color: var(--ink);
+    line-height: 1.6;
+    font-weight: 500;
+    margin-bottom: 24px;
+    font-family: var(--serif);
+  }
+
+  /* BUTTONS */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: var(--mono);
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s ease;
+    letter-spacing: 0.02em;
+    outline: none;
+  }
+
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: #234a31; }
+  .btn-primary:disabled { background: var(--ink-light); cursor: not-allowed; }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--ink-mid);
+    border: 1px solid var(--paper-dark);
+  }
+  .btn-ghost:hover { border-color: var(--ink-light); color: var(--ink); }
+
+  .btn-warn {
+    background: var(--warn-light);
+    color: var(--warn);
+    border: 1px solid #f0c4a8;
+  }
+  .btn-warn:hover { background: #fae4d4; }
+
+  .button-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  /* LOADING */
+  .loading-text {
+    font-size: 14px;
+    color: var(--ink-light);
+    text-align: center;
+    padding: 8px 0 24px;
+    font-style: italic;
+  }
+
+  .loading-text.passing {
+    color: var(--accent);
+    font-style: normal;
+    font-weight: 500;
+  }
+
+  /* Spinner — appears above loading text. CSS-only animation. */
+  .spinner {
+    display: block;
+    width: 28px;
+    height: 28px;
+    margin: 18px auto 4px;
+    border: 2.5px solid var(--paper-dark);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: cyr-spin 0.8s linear infinite;
+  }
+
+  @keyframes cyr-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* When the loading state is "passing" (final handoff), the spinner color
+     shifts to match the now-bold accent text. */
+  .loading-text.passing + .spinner,
+  .spinner.passing {
+    border-top-color: var(--accent);
+  }
+
+  /* DIVIDER */
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--ink-light);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .divider::before, .divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--paper-dark);
+  }
+
+  /* CONFIRMATION */
+  .confirmation-card { text-align: center; padding: 16px 0; }
+
+  .confirmation-check {
+    width: 56px;
+    height: 56px;
+    background: var(--accent-light);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+  }
+
+  .confirmation-title {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 400;
+    color: var(--ink);
+    margin: 0 0 16px;
+  }
+
+  .confirmation-echo {
+    font-size: 15px;
+    color: var(--ink-mid);
+    line-height: 1.7;
+    font-style: italic;
+    margin: 0 auto 20px;
+    max-width: 540px;
+    padding: 14px 18px;
+    background: var(--paper);
+    border-left: 3px solid var(--accent);
+    text-align: left;
+    border-radius: 4px;
+  }
+
+  .confirmation-followup {
+    font-size: 15px;
+    color: var(--ink-mid);
+    line-height: 1.7;
+    margin: 0 0 8px;
+  }
+
+  .confirmation-callnote {
+    font-size: 13px;
+    color: var(--ink-light);
+    margin: 12px 0 0;
+    font-style: italic;
+  }
+
+  /* ERROR */
+  .error-text {
+    color: var(--warn);
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 12px 0;
+  }
+
+  /* FOOTER */
+  .workbench-note {
+    font-size: 11px;
+    color: var(--ink-light);
+    text-align: center;
+    line-height: 1.6;
+    margin-top: 32px;
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 480px) {
+    .button-row { flex-direction: column; }
+    .btn { width: 100%; justify-content: center; }
+  }
+
+  /* HINT TEXT — appears once visitor has content */
+  .hint-text {
+    font-size: 13px;
+    color: var(--ink-light);
+    text-align: center;
+    margin-top: 12px;
+    margin-bottom: 0;
+    font-style: italic;
+  }
+
+  /* V3: VISITOR BRIEFING */
+  .visitor-briefing-text {
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.7;
+    margin: 0;
+  }
+
+  /* V3: PATTERNS */
+  .patterns-frame {
+    font-size: 13px;
+    color: var(--ink-light);
+    line-height: 1.6;
+    font-style: italic;
+    margin: 0 0 14px;
+  }
+  .patterns-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .patterns-list li {
+    font-size: 14.5px;
+    color: var(--ink);
+    line-height: 1.65;
+    padding: 10px 0 10px 22px;
+    border-bottom: 1px solid var(--paper-dark);
+    position: relative;
+  }
+  .patterns-list li:last-child {
+    border-bottom: none;
+  }
+  .patterns-list li::before {
+    content: '·';
+    position: absolute;
+    left: 6px;
+    top: 8px;
+    color: var(--accent);
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  /* V3: CTA */
+  .cta-text {
+    font-size: 14px;
+    color: var(--ink-mid);
+    line-height: 1.6;
+    margin: 0 0 14px;
+  }
+  .cta-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 15px;
+    border-bottom: 1px solid var(--accent);
+    padding-bottom: 2px;
+    transition: opacity 0.15s ease;
+  }
+  .cta-link:hover {
+    opacity: 0.7;
+  }
+
+  /* UTILITY */
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>YourSituation</h1>
+  <p>Tell us what's going on — in your own words</p>
+</header>
+
+<div class="workbench">
+
+  <!-- GREETING BANNER -->
+  <div class="greeting-banner hidden" id="greeting-banner">
+    <span class="greeting-text" id="greeting-text"></span>
+    <span class="greeting-meta" id="greeting-meta"></span>
+  </div>
+
+  <!-- ============ STAGE 1: INITIAL CAPTURE ============ -->
+  <div class="card" id="card-initial">
+    <div class="card-label">Your story</div>
+    <p style="font-size:14px; color:var(--ink-mid); margin-bottom:20px; line-height:1.6;">
+      Tap the mic and tell us what's going on — buying, selling, your timeline, whatever matters.
+      Speak naturally, take your time. Tap again when you're done.
+    </p>
+    <div class="mic-area">
+      <button class="mic-btn" id="mic-btn-initial" title="Tap to speak" aria-label="Start recording">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm-1 17.93V21h2v-2.07A8 8 0 0 0 20 11h-2a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.93z"/>
+        </svg>
+      </button>
+      <div class="mic-status" id="mic-status-initial">Tap to speak</div>
+    </div>
+    <p style="font-size:13px; color:var(--ink-light); text-align:center; margin-top:20px;">
+      Prefer to type?
+      <button id="type-toggle-initial" style="background:none; border:none; color:var(--accent); font-size:13px; font-family:var(--mono); cursor:pointer; text-decoration:underline; padding:0;">That works too.</button>
+    </p>
+    <textarea class="transcript-box hidden" id="transcript-initial" placeholder=""></textarea>
+    <p class="hint-text hidden" id="hint-initial">Tap the mic again when you're done, and then press Continue below.</p>
+    <div class="button-row" style="margin-top:18px;" id="initial-actions" >
+      <button class="btn btn-primary" id="btn-continue-initial" disabled>Continue →</button>
+      <button class="btn btn-ghost" id="btn-startover-initial">Start Over</button>
+    </div>
+  </div>
+
+  <!-- ============ STAGE 2: PLAYBACK + PERMISSION ASK ============ -->
+  <div class="card hidden" id="card-playback">
+    <div class="card-label" id="playback-label">Here's what I'm hearing</div>
+    <div class="paragraph-box" id="paragraph-playback"></div>
+    <div class="permission-ask" id="permission-ask"></div>
+    <div class="button-row" id="playback-actions">
+      <button class="btn btn-primary" id="btn-permission-yes">Sure, ask</button>
+      <button class="btn btn-ghost" id="btn-permission-no">I'm good, send it</button>
+    </div>
+  </div>
+
+  <!-- ============ STAGE 3: PROBE CAPTURE ============ -->
+  <div class="card hidden" id="card-probe">
+    <div class="card-label">Quick follow-up</div>
+    <div class="paragraph-box collapsed" id="paragraph-collapsed"></div>
+    <div class="probe-replying-to">Replying to:</div>
+    <div class="probe-question" id="probe-question"></div>
+    <div class="mic-area">
+      <button class="mic-btn" id="mic-btn-probe" title="Tap to speak" aria-label="Start recording">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm-1 17.93V21h2v-2.07A8 8 0 0 0 20 11h-2a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.93z"/>
+        </svg>
+      </button>
+      <div class="mic-status" id="mic-status-probe">Tap to speak</div>
+    </div>
+    <p style="font-size:13px; color:var(--ink-light); text-align:center; margin-top:20px;">
+      Prefer to type?
+      <button id="type-toggle-probe" style="background:none; border:none; color:var(--accent); font-size:13px; font-family:var(--mono); cursor:pointer; text-decoration:underline; padding:0;">That works too.</button>
+    </p>
+    <textarea class="transcript-box hidden" id="transcript-probe" placeholder=""></textarea>
+    <p class="hint-text hidden" id="hint-probe">Tap the mic again when you're done, and then press Send it below.</p>
+    <div class="button-row" style="margin-top:18px;">
+      <button class="btn btn-primary" id="btn-continue-probe" disabled>Send it →</button>
+    </div>
+  </div>
+
+  <!-- ============ STAGE 4: LOADING / PASSING ALONG ============ -->
+  <div class="card hidden" id="card-loading">
+    <div class="spinner" id="loading-spinner" aria-hidden="true"></div>
+    <div class="loading-text" id="loading-text">One sec — getting that down...</div>
+  </div>
+
+  <!-- ============ STAGE 5: CONFIRMATION ============ -->
+  <div class="card hidden" id="card-confirmation">
+    <div class="confirmation-card">
+      <div class="confirmation-check">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+      <h2 class="confirmation-title">You're all set, <span id="confirm-name">there</span>.</h2>
+      <div class="confirmation-echo hidden" id="confirm-echo"></div>
+      <p class="confirmation-followup">Vincent or Jane will be in touch personally —<br>usually within a few hours.</p>
+      <p class="confirmation-callnote">Watch for a call from a (610) number — that's us.</p>
+    </div>
+  </div>
+
+  <!-- ============ STAGE 5b: VISITOR BRIEFING (v3) ============ -->
+  <div class="card hidden" id="card-visitor-briefing">
+    <div class="card-label">What to expect from the call</div>
+    <p class="visitor-briefing-text" id="visitor-briefing-text"></p>
+  </div>
+
+  <!-- ============ STAGE 5c: CLIENT PATTERNS (v3) ============ -->
+  <div class="card hidden" id="card-patterns">
+    <div class="card-label">Some of our clients have...</div>
+    <p class="patterns-frame">Some of this may apply to your situation, some may not — it helps us frame our understanding.</p>
+    <ul class="patterns-list" id="patterns-list"></ul>
+  </div>
+
+  <!-- ============ STAGE 5d: SITUATION PAGE CTA (v3) ============ -->
+  <div class="card hidden" id="card-situation-cta">
+    <div class="card-label">While you wait</div>
+    <p class="cta-text" id="cta-text">Read more about what to expect.</p>
+    <a class="cta-link" id="cta-link" href="https://thecyrteam.com/your-situation/" target="_blank" rel="noopener">Open the page →</a>
+  </div>
+
+  <!-- ============ ERROR FALLBACK (TIER 1: RETRY) ============ -->
+  <div class="card hidden" id="card-error-retry">
+    <div class="card-label">Something hiccuped</div>
+    <p class="error-text" id="error-text-retry">Hmm, something glitched. Mind trying once more?</p>
+    <div class="button-row">
+      <button class="btn btn-primary" id="btn-retry">Try again</button>
+    </div>
+  </div>
+
+</div>
+
+<p class="workbench-note">The Cyr Team at REAL of Pennsylvania · Chester County &amp; Beyond</p>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// STATE & CONFIG
+// ═══════════════════════════════════════════════════════════════
+
+const STATE = {
+  stage: 'INITIAL',           // INITIAL | PLAYBACK | PROBE | LOADING | CONFIRMATION | ERROR
+  round1Transcript: '',       // what visitor said in round 1
+  round2Transcript: '',       // what visitor said in probe response (if any)
+  cumulativeTranscript: '',   // round1 + round2
+  paragraph: '',              // most recent paragraph from Claude
+  probe: '',                  // the probe Claude generated
+  permissionGranted: false,   // did visitor say "sure, ask"
+  refinementCount: 0,         // 0 or 1
+  retryAttempts: 0,           // tier-1 retry counter
+  pendingRetry: null,         // { fn: ..., context: ... } for retry
+  lastClaudeResponse: null,   // last full JSON from Claude
+  roundSnapshots: [],         // v2.1: per-round {structured, paragraph, probe} captured as each call returns
+  round2Outcome: 'not_applicable', // v2.1: why round 2 looks the way it does (answered | declined_timeout | declined_explicit | transcription_empty | not_applicable)
+};
+
+// URL params
+const params = new URLSearchParams(window.location.search);
+const confirmedName = params.get('name') ? decodeURIComponent(params.get('name')).trim() : null;
+const confirmedPhone = params.get('phone') ? decodeURIComponent(params.get('phone')).trim() : null;
+const confirmedEmail = params.get('email') ? decodeURIComponent(params.get('email')).trim() : null;
+const confirmedScenario = params.get('scenario') ? decodeURIComponent(params.get('scenario')).trim() : null;
+// v3.2: Layer 1 referrer capture — passed through from /tell-us/ via the redirect snippet.
+// This is the page the visitor was on immediately before /tell-us/ — typically a
+// /your-situation/[scenario]/ page or an AEO content page. Used by Claude to enrich
+// the team briefing with content-attribution context (e.g. "visitor came from
+// the dual-agency content"). Pure-HTTP referrer, no tracking, no cross-session data.
+const referrerPage = params.get('referrer') ? decodeURIComponent(params.get('referrer')).trim() : null;
+
+// Scenario map (greeting only — probe/briefing logic lives in Claude prompt)
+const SCENARIO_MAP = {
+  'buying':           { label: 'Buyer',            greeting: 'tell us about your home search' },
+  'buyer':            { label: 'Buyer',            greeting: 'tell us about your home search' },
+  'selling':          { label: 'Seller',           greeting: 'tell us about your home and situation' },
+  'seller':           { label: 'Seller',           greeting: 'tell us about your home and situation' },
+  'divorce':          { label: 'Divorce',          greeting: 'tell us about your situation — whatever you\'re comfortable sharing' },
+  'downsizing':       { label: 'Downsizing',       greeting: 'tell us about your downsizing situation' },
+  'first time buyer': { label: 'First-time buyer', greeting: 'tell us what you\'re looking for — no experience needed' },
+  'relocation':       { label: 'Relocation',       greeting: 'tell us about your move and timeline' },
+  'estate':           { label: 'Estate sale',      greeting: 'tell us about the property and where things stand' },
+  'general inquiry':  { label: 'General inquiry',  greeting: 'tell us what\'s going on — whatever brought you here' },
+  'luxury':           { label: 'Luxury',           greeting: 'tell us about the property and what you\'re looking for' },
+  'moving up':        { label: 'Moving up',        greeting: 'tell us about selling your current home and what you\'re looking for next' },
+};
+
+const scenarioKey = confirmedScenario ? confirmedScenario.toLowerCase() : null;
+const scenarioData = scenarioKey
+  ? (SCENARIO_MAP[scenarioKey] || { label: confirmedScenario, greeting: 'tell us about your situation' })
+  : null;
+
+// Greeting banner
+if (confirmedName) {
+  const banner = document.getElementById('greeting-banner');
+  const greetingText = document.getElementById('greeting-text');
+  const greetingMeta = document.getElementById('greeting-meta');
+  banner.classList.remove('hidden');
+  banner.style.display = 'flex';
+  const greetingAction = scenarioData ? scenarioData.greeting : 'tell us about your situation';
+  greetingText.textContent = 'Hi ' + confirmedName + ' — ' + greetingAction;
+  // Phone removed from public-facing meta (privacy); show scenario only.
+  greetingMeta.textContent = scenarioData ? scenarioData.label : '';
+  document.title = confirmedName + ' — YourSituation';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SPEECH RECOGNITION (REUSED FOR ROUND 1 + PROBE)
+// ═══════════════════════════════════════════════════════════════
+
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+class MicHandler {
+  constructor(micBtn, micStatus, transcriptBox, onTranscriptChange, hintEl) {
+    this.micBtn = micBtn;
+    this.micStatus = micStatus;
+    this.transcriptBox = transcriptBox;
+    this.onTranscriptChange = onTranscriptChange;
+    this.hintEl = hintEl || null;
+    this.recognition = null;
+    this.isRecording = false;
+    this.finalTranscript = '';
+
+    if (!SpeechRecognition) {
+      this.micStatus.textContent = 'Voice not supported — type below';
+      this.micStatus.classList.add('error');
+      this.micBtn.disabled = true;
+      this.micBtn.style.opacity = '0.4';
+      this.transcriptBox.classList.remove('hidden');
+      // Show the hint immediately for type-only flow so they know about Continue/Send it
+      if (this.hintEl) this.hintEl.classList.remove('hidden');
+      return;
+    }
+
+    this.recognition = new SpeechRecognition();
+    this.recognition.continuous = true;
+    this.recognition.interimResults = true;
+    this.recognition.lang = 'en-US';
+
+    this.recognition.onstart = () => {
+      this.isRecording = true;
+      this.micBtn.classList.add('recording');
+      this.micStatus.textContent = 'Listening... tap again to stop';
+      this.micStatus.className = 'mic-status recording';
+      this.finalTranscript = this.transcriptBox.value || '';
+      // Show transcript box during recording for visual reassurance
+      this.transcriptBox.classList.remove('hidden');
+      // Show the hint while recording — names both actions ("tap mic again, then press Continue/Send it")
+      if (this.hintEl) this.hintEl.classList.remove('hidden');
+    };
+
+    this.recognition.onresult = (e) => {
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          this.finalTranscript += e.results[i][0].transcript + ' ';
+        } else {
+          interim += e.results[i][0].transcript;
+        }
+      }
+      // Android Chrome cumulative interim handling
+      let combined = this.finalTranscript + interim;
+      if (interim && this.finalTranscript) {
+        const interimClean = interim.trim();
+        const finalClean = this.finalTranscript.trim();
+        if (interimClean.toLowerCase().startsWith(finalClean.toLowerCase())) {
+          combined = finalClean + ' ' + interimClean.slice(finalClean.length).trim();
+        } else {
+          combined = finalClean + ' ' + interimClean;
+        }
+      }
+      this.transcriptBox.value = combined;
+      if (this.onTranscriptChange) this.onTranscriptChange();
+    };
+
+    this.recognition.onerror = (e) => {
+      const msgs = {
+        'not-allowed': 'Microphone access denied — check browser permissions',
+        'no-speech': 'No speech detected — try again',
+        'network': 'Network error during transcription'
+      };
+      this.micStatus.textContent = msgs[e.error] || 'Error: ' + e.error;
+      this.micStatus.className = 'mic-status error';
+      this.stop();
+    };
+
+    this.recognition.onend = () => {
+      if (this.isRecording) this.stop();
+    };
+
+    this.micBtn.addEventListener('click', () => {
+      if (this.isRecording) {
+        this.recognition.stop();
+        this.stop();
+      } else {
+        try { this.recognition.start(); } catch(e) {
+          this.micStatus.textContent = 'Could not start — refresh and try again';
+          this.micStatus.className = 'mic-status error';
+        }
+      }
+    });
+
+    this.transcriptBox.addEventListener('input', () => {
+      if (this.onTranscriptChange) this.onTranscriptChange();
+    });
+  }
+
+  stop() {
+    this.isRecording = false;
+    this.micBtn.classList.remove('recording');
+    this.micStatus.textContent = 'Tap to speak again or edit below';
+    this.micStatus.className = 'mic-status';
+    if (this.recognition) { try { this.recognition.stop(); } catch(e) {} }
+    // Cleanup interim/final reconciliation
+    const raw = this.transcriptBox.value.trim();
+    if (raw && this.finalTranscript.trim()) {
+      const finalClean = this.finalTranscript.trim();
+      if (raw.length > finalClean.length) {
+        const extra = raw.slice(finalClean.length).trim();
+        this.transcriptBox.value = extra ? finalClean + ' ' + extra : finalClean;
+      } else {
+        this.transcriptBox.value = finalClean;
+      }
+    }
+    if (this.onTranscriptChange) this.onTranscriptChange();
+  }
+
+  reset() {
+    this.transcriptBox.value = '';
+    this.finalTranscript = '';
+    if (this.isRecording) { this.recognition.stop(); this.stop(); }
+    if (this.onTranscriptChange) this.onTranscriptChange();
+  }
+
+  getTranscript() { return this.transcriptBox.value.trim(); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STAGE TRANSITIONS
+// ═══════════════════════════════════════════════════════════════
+
+// All cards managed by the stage system, including v3 confirmation supplements
+const ALL_CARDS = [
+  'card-initial', 'card-playback', 'card-probe', 'card-loading',
+  'card-confirmation', 'card-visitor-briefing', 'card-patterns', 'card-situation-cta',
+  'card-error-retry'
+];
+
+function showStage(stage) {
+  STATE.stage = stage;
+  ALL_CARDS.forEach(id => {
+    document.getElementById(id).classList.add('hidden');
+  });
+  const idMap = {
+    INITIAL: 'card-initial',
+    PLAYBACK: 'card-playback',
+    PROBE: 'card-probe',
+    LOADING: 'card-loading',
+    CONFIRMATION: 'card-confirmation',
+    ERROR: 'card-error-retry'
+  };
+  if (idMap[stage]) document.getElementById(idMap[stage]).classList.remove('hidden');
+
+  // Hide greeting banner once past initial
+  if (stage !== 'INITIAL' && stage !== 'PLAYBACK') {
+    const banner = document.getElementById('greeting-banner');
+    if (banner) banner.style.display = 'none';
+  }
+}
+
+function setLoading(text, passing) {
+  ALL_CARDS.forEach(id => {
+    if (id !== 'card-loading') document.getElementById(id).classList.add('hidden');
+  });
+  document.getElementById('card-loading').classList.remove('hidden');
+  const lt = document.getElementById('loading-text');
+  lt.textContent = text;
+  lt.className = passing ? 'loading-text passing' : 'loading-text';
+  // Sync spinner state with the text — same accent shift on the "passing" handoff.
+  const sp = document.getElementById('loading-spinner');
+  if (sp) sp.className = passing ? 'spinner passing' : 'spinner';
+  STATE.stage = 'LOADING';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CLAUDE API CALLS
+// ═══════════════════════════════════════════════════════════════
+
+async function callClaude({ transcript, isFinal, permissionGranted }) {
+  const lines = [
+    `ROUND: ${permissionGranted ? 2 : 1}`,
+    `IS_FINAL: ${isFinal ? 'true' : 'false'}`,
+    `PERMISSION_GRANTED: ${permissionGranted ? 'true' : 'false'}`,
+    `NAME: ${confirmedName || ''}`,
+    `PHONE: ${confirmedPhone || ''}`,
+    `EMAIL: ${confirmedEmail || ''}`,
+    `SCENARIO: ${confirmedScenario || 'General Inquiry'}`,
+  ];
+  // v3.2: include referrer page if present, so Claude can use content-attribution context
+  if (referrerPage) {
+    lines.push(`REFERRER_PAGE: ${referrerPage}`);
+  }
+  lines.push(``, `TRANSCRIPT:`, transcript);
+  const userMessage = lines.join('\n');
+
+  const res = await fetch('/api/claude', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      messages: [{ role: 'user', content: userMessage }]
+    })
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => '');
+    throw new Error(`Claude API ${res.status}: ${errBody.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  const text = data.content?.[0]?.text || '';
+  const cleaned = text.replace(/```json|```/g, '').trim();
+  return JSON.parse(cleaned);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ZAPIER WEBHOOK — fires once at final submission
+// ═══════════════════════════════════════════════════════════════
+
+async function fireZapier(payload) {
+  try {
+    await fetch('/api/zapier', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  } catch (err) {
+    console.error('Zapier webhook error:', err);
+    // Non-fatal — confirmation still shows. Lead is preserved by Airtable via Zapier
+    // best-effort, but if this entirely fails, the team won't get a FUB note.
+    // Surface to user only if the Claude path also failed (handled in callers).
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FALLBACK SUBMISSION (when Claude fails twice — preserve the lead)
+// ═══════════════════════════════════════════════════════════════
+
+async function fireFallbackZapier(transcript) {
+  const fallbackPayload = {
+    name: confirmedName,
+    phone: confirmedPhone,
+    email: confirmedEmail,
+    scenario: confirmedScenario,
+    situation: 'unclear',
+    area: null,
+    price_range: null,
+    must_have: null,
+    deal_breaker: null,
+    timeline: null,
+    pre_approved: 'not mentioned',
+    motivation: null,
+    notes: 'AI fallback — Claude unavailable. See raw transcript.',
+    transcript: transcript,
+    final_paragraph: '',
+    refinement_count: 0,
+    team_briefing_short: 'AI fallback — manual triage needed.',
+    team_briefing_full: 'Claude API was unavailable when this submission landed. Raw transcript preserved. Manually review and contact visitor.',
+    submitted_at: new Date().toISOString(),
+    fallback: true
+  };
+  await fireZapier(fallbackPayload);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ERROR HANDLING — TIER 1 (RETRY) → TIER 2 (FALLBACK)
+// ═══════════════════════════════════════════════════════════════
+
+function handleApiError(retryFn) {
+  STATE.retryAttempts++;
+  if (STATE.retryAttempts === 1) {
+    // Tier 1: show retry button
+    STATE.pendingRetry = retryFn;
+    showStage('ERROR');
+  } else {
+    // Tier 2: silent fallback to preserve the lead
+    STATE.retryAttempts = 0;
+    setLoading('Got it — passing this along now.', true);
+    setTimeout(async () => {
+      await fireFallbackZapier(STATE.cumulativeTranscript || STATE.round1Transcript);
+      showConfirmation(null);
+    }, 1000);
+  }
+}
+
+document.getElementById('btn-retry').addEventListener('click', () => {
+  if (STATE.pendingRetry) {
+    const fn = STATE.pendingRetry;
+    STATE.pendingRetry = null;
+    fn();
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// STAGE 1 → STAGE 2: VISITOR SUBMITS ROUND 1 INPUT
+// ═══════════════════════════════════════════════════════════════
+
+const micInitial = new MicHandler(
+  document.getElementById('mic-btn-initial'),
+  document.getElementById('mic-status-initial'),
+  document.getElementById('transcript-initial'),
+  () => {
+    const hasContent = micInitial.getTranscript().length >= 5;
+    document.getElementById('btn-continue-initial').disabled = !hasContent;
+    // Hint stays visible once shown — once they know about Continue, they don't need to be unreminded
+  },
+  document.getElementById('hint-initial')
+);
+
+document.getElementById('type-toggle-initial').addEventListener('click', () => {
+  const tb = document.getElementById('transcript-initial');
+  tb.classList.remove('hidden');
+  tb.focus();
+  // Type-only path: show the hint so they know about Continue
+  document.getElementById('hint-initial').classList.remove('hidden');
+});
+
+document.getElementById('btn-startover-initial').addEventListener('click', () => {
+  micInitial.reset();
+});
+
+document.getElementById('btn-continue-initial').addEventListener('click', async () => {
+  STATE.round1Transcript = micInitial.getTranscript();
+  STATE.cumulativeTranscript = STATE.round1Transcript;
+  await processRound1();
+});
+
+async function processRound1() {
+  setLoading('One sec — getting that down...', false);
+  try {
+    const response = await callClaude({
+      transcript: STATE.cumulativeTranscript,
+      isFinal: false,
+      permissionGranted: false
+    });
+    STATE.lastClaudeResponse = response;
+    STATE.paragraph = response.paragraph || '';
+    STATE.retryAttempts = 0; // reset on success
+    // v2.1: snapshot Round 1 for the child-record write
+    STATE.roundSnapshots[0] = {
+      round_number: 1,
+      created_at: new Date().toISOString(),
+      structured: response.structured || null,
+      paragraph: response.paragraph || '',
+      probe_offered: response.permission_ask || ''
+    };
+    showPlayback(response);
+  } catch (err) {
+    console.error('Round 1 Claude error:', err);
+    handleApiError(processRound1);
+  }
+}
+
+function showPlayback(response) {
+  document.getElementById('paragraph-playback').textContent = response.paragraph || '';
+  document.getElementById('permission-ask').textContent =
+    response.permission_ask || 'Mind if I ask one more thing before we hand off, or are you good?';
+  showStage('PLAYBACK');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STAGE 2 BRANCH: "I'M GOOD, SEND IT"
+// ═══════════════════════════════════════════════════════════════
+
+document.getElementById('btn-permission-no').addEventListener('click', async () => {
+  STATE.permissionGranted = false;
+  await finalizeAndSubmit();
+});
+
+// ═══════════════════════════════════════════════════════════════
+// STAGE 2 BRANCH: "SURE, ASK" → STAGE 3 (PROBE)
+// ═══════════════════════════════════════════════════════════════
+
+document.getElementById('btn-permission-yes').addEventListener('click', async () => {
+  STATE.permissionGranted = true;
+  setLoading('Thinking of one good question...', false);
+  try {
+    const response = await callClaude({
+      transcript: STATE.cumulativeTranscript,
+      isFinal: false,
+      permissionGranted: true
+    });
+    STATE.lastClaudeResponse = response;
+    STATE.paragraph = response.paragraph || STATE.paragraph;
+    STATE.probe = response.probe || '';
+    STATE.retryAttempts = 0;
+    // v2.1: seed the Round 2 snapshot with the probe + structured state at probe time.
+    // transcript_segment + outcome are filled in at submit (btn-continue-probe), since
+    // we don't yet know what the visitor will answer.
+    STATE.roundSnapshots[1] = {
+      round_number: 2,
+      created_at: new Date().toISOString(),
+      structured: response.structured || null,
+      paragraph: response.paragraph || '',
+      probe_offered: STATE.probe
+    };
+    showProbe();
+  } catch (err) {
+    console.error('Probe Claude error:', err);
+    handleApiError(async () => {
+      // On retry of probe call
+      STATE.permissionGranted = true;
+      document.getElementById('btn-permission-yes').click();
+    });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// STAGE 3: PROBE
+// ═══════════════════════════════════════════════════════════════
+
+const micProbe = new MicHandler(
+  document.getElementById('mic-btn-probe'),
+  document.getElementById('mic-status-probe'),
+  document.getElementById('transcript-probe'),
+  () => {
+    const hasContent = micProbe.getTranscript().length >= 2;
+    // Once timer has unlocked the button, leave it enabled regardless of length.
+    if (probeButtonForceEnabled) {
+      document.getElementById('btn-continue-probe').disabled = false;
+    } else {
+      document.getElementById('btn-continue-probe').disabled = !hasContent;
+    }
+    // Hint stays visible once shown
+  },
+  document.getElementById('hint-probe')
+);
+
+// 3-second escape hatch: after 3 seconds on the probe screen, enable Continue
+// regardless of whether the visitor typed or spoke. Lets them skip without
+// being stuck or needing a separate "skip" link. Set when probe screen shows.
+let probeButtonForceEnabled = false;
+let probeUnlockTimer = null;
+
+function unlockProbeButtonAfterDelay() {
+  probeButtonForceEnabled = false;
+  if (probeUnlockTimer) clearTimeout(probeUnlockTimer);
+  probeUnlockTimer = setTimeout(() => {
+    probeButtonForceEnabled = true;
+    document.getElementById('btn-continue-probe').disabled = false;
+    document.getElementById('hint-probe').classList.remove('hidden');
+  }, 3000);
+}
+
+document.getElementById('type-toggle-probe').addEventListener('click', () => {
+  const tb = document.getElementById('transcript-probe');
+  tb.classList.remove('hidden');
+  tb.focus();
+  // Type-only path: show the hint
+  document.getElementById('hint-probe').classList.remove('hidden');
+});
+
+function showProbe() {
+  document.getElementById('paragraph-collapsed').textContent = STATE.paragraph;
+  document.getElementById('probe-question').textContent = STATE.probe;
+  micProbe.reset();
+  // Start probe screen with Continue disabled and hint hidden — gets enabled
+  // either by visitor input crossing the length threshold, OR by the 3-second
+  // escape hatch timer.
+  document.getElementById('btn-continue-probe').disabled = true;
+  document.getElementById('hint-probe').classList.add('hidden');
+  unlockProbeButtonAfterDelay();
+  showStage('PROBE');
+}
+
+document.getElementById('btn-continue-probe').addEventListener('click', async () => {
+  // v2.1: capture whether the timer had fired BEFORE we clear it — this is what
+  // distinguishes an explicit skip from a timed-out one.
+  const timerHadFired = probeButtonForceEnabled;
+
+  // Stop the timer if user clicked before/after it fired
+  if (probeUnlockTimer) { clearTimeout(probeUnlockTimer); probeUnlockTimer = null; }
+
+  STATE.round2Transcript = micProbe.getTranscript();
+  // If probe was answered, append it to the cumulative transcript with context.
+  // If empty (escape-hatch path), don't append — keep round 1 as the full transcript.
+  if (STATE.round2Transcript && STATE.round2Transcript.length > 0) {
+    STATE.cumulativeTranscript = STATE.round1Transcript + '\n\n[Follow-up answer to: "' + STATE.probe + '"]\n' + STATE.round2Transcript;
+    STATE.refinementCount = 1;
+    STATE.round2Outcome = 'answered';
+  } else {
+    STATE.cumulativeTranscript = STATE.round1Transcript;
+    STATE.refinementCount = 0; // they were asked but didn't engage — count as no refinement
+    // Empty answer: timer-fired ⇒ declined_timeout; clicked before timer ⇒ declined_explicit.
+    // (If the mic was engaged but produced nothing, that still surfaces here as an empty
+    //  transcript; treat it under the same timer/explicit split. A dedicated
+    //  'transcription_empty' value can be wired later if the mic layer exposes a
+    //  "spoke-but-empty" flag — today the page can't distinguish silence from a tech failure.)
+    STATE.round2Outcome = timerHadFired ? 'declined_timeout' : 'declined_explicit';
+  }
+  await finalizeAndSubmit();
+});
+
+// ═══════════════════════════════════════════════════════════════
+// FINALIZATION: CALL CLAUDE WITH IS_FINAL=true → FIRE ZAPIER
+// ═══════════════════════════════════════════════════════════════
+
+async function finalizeAndSubmit() {
+  setLoading('Got it — passing this along now.', true);
+  // 1-second feel-of-AI delay before the actual call
+  await new Promise(r => setTimeout(r, 1000));
+
+  try {
+    const response = await callClaude({
+      transcript: STATE.cumulativeTranscript,
+      isFinal: true,
+      permissionGranted: false // probe is always null in final
+    });
+    STATE.lastClaudeResponse = response;
+    STATE.paragraph = response.paragraph || STATE.paragraph;
+    STATE.retryAttempts = 0;
+
+    // Build Zapier payload — everything Zapier needs to do parent + child writes
+    const structured = response.structured || {};
+    const selectedPatterns = Array.isArray(response.selected_patterns) ? response.selected_patterns : [];
+    // v2.1: assemble per-round child records from snapshots captured during the flow.
+    // The probe path produces 2 rounds; the "I'm good, send it" path produces 1.
+    const rounds = [];
+    if (STATE.roundSnapshots[0]) {
+      const r1 = STATE.roundSnapshots[0];
+      rounds.push({
+        round_number: 1,
+        created_at: r1.created_at,
+        transcript_segment: STATE.round1Transcript,
+        cumulative_transcript: STATE.round1Transcript,
+        structured_snapshot: r1.structured ? JSON.stringify(r1.structured) : '',
+        paragraph_playback: r1.paragraph,
+        probe_asked: r1.probe_offered,
+        round_outcome: 'not_applicable',
+        confirmed: STATE.permissionGranted ? false : true  // if no probe taken, Round 1 is the confirmed round
+      });
+    }
+    if (STATE.permissionGranted && STATE.roundSnapshots[1]) {
+      const r2 = STATE.roundSnapshots[1];
+      rounds.push({
+        round_number: 2,
+        created_at: r2.created_at,
+        transcript_segment: STATE.round2Transcript || '',  // intentionally empty when declined
+        cumulative_transcript: STATE.cumulativeTranscript,
+        structured_snapshot: r2.structured ? JSON.stringify(r2.structured) : '',
+        paragraph_playback: r2.paragraph,
+        probe_asked: STATE.probe || '',
+        round_outcome: STATE.round2Outcome,
+        confirmed: true   // Round 2 is always the last/confirmed round when present
+      });
+    }
+    const payload = {
+      // Form data
+      name: confirmedName,
+      phone: confirmedPhone,
+      email: confirmedEmail,
+      scenario: confirmedScenario,
+
+      // Structured extraction (final state)
+      situation: structured.situation || null,
+      area: structured.area || null,
+      price_range: structured.price_range || null,
+      must_have: structured.must_have || null,
+      deal_breaker: structured.deal_breaker || null,
+      timeline: structured.timeline || null,
+      pre_approved: structured.pre_approved || 'not mentioned',
+      motivation: structured.motivation || null,
+      notes: structured.notes || null,
+
+      // FUB note subject (preserve v1 format)
+      subject: `Inbound - ${structured.situation || 'inquiry'} - ${structured.area || 'unknown'} - ${structured.motivation || 'unknown'}`,
+
+      // V2 additions
+      final_paragraph: response.paragraph || '',
+      refinement_count: STATE.refinementCount,
+      team_briefing_short: response.team_briefing_short || '',
+      team_briefing_full: response.team_briefing_full || '',
+
+      // V3 additions
+      visitor_briefing: response.visitor_briefing || '',
+      selected_patterns: selectedPatterns,
+      selected_patterns_text: selectedPatterns.join('\n'),
+      scenario_detected: response.scenario_detected || confirmedScenario || 'General Inquiry',
+      situation_page_url: response.situation_page_url || '/your-situation/',
+      referrer_page: referrerPage || '',
+
+      // Round detail (for Zapier to write child records) — v2.1 structured array
+      rounds: rounds,
+      // JSON-string version: survives Zapier Catch Hook intact (commas inside transcripts
+      // would otherwise break the flattened array). This is what the Zap Code step parses.
+      // Prefix with a marker so Zapier's Catch Hook treats this as a plain string
+      // (not a JSON array it will auto-explode into comma-joined leaves). The Zap
+      // Code step strips the "JSON::" prefix and parses the remainder.
+      rounds_json: 'JSON::' + JSON.stringify(rounds),
+      // Back-compat: keep the flat fields too, in case any existing Zap mapping reads them.
+      // Safe to remove once the Zap is switched to the rounds[] loop.
+      round1_transcript: STATE.round1Transcript,
+      round2_transcript: STATE.round2Transcript || '',
+      probe_asked: STATE.probe || '',
+
+      // Full cumulative transcript (preserve v1 field for FUB compatibility)
+      transcript: STATE.cumulativeTranscript,
+
+      submitted_at: new Date().toISOString(),
+      fallback: false
+    };
+
+    await fireZapier(payload);
+    showConfirmation(response);
+
+  } catch (err) {
+    console.error('Final Claude error:', err);
+    handleApiError(finalizeAndSubmit);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONFIRMATION (with v3 visitor briefing, patterns, and CTA)
+// ═══════════════════════════════════════════════════════════════
+
+function showConfirmation(response) {
+  // Hide all cards first, then reveal confirmation + applicable v3 cards
+  ALL_CARDS.forEach(id => {
+    document.getElementById(id).classList.add('hidden');
+  });
+
+  // Hide greeting banner
+  const banner = document.getElementById('greeting-banner');
+  if (banner) banner.style.display = 'none';
+
+  // Confirmation card
+  if (confirmedName) {
+    document.getElementById('confirm-name').textContent = confirmedName;
+  }
+
+  // Echo back the first sentence of the paragraph
+  const paragraph = response && typeof response === 'object' ? (response.paragraph || '') : '';
+  if (paragraph && paragraph.length > 0) {
+    const echo = document.getElementById('confirm-echo');
+    const firstSentence = paragraph.split(/(?<=[.!?])\s+/)[0] || paragraph;
+    echo.textContent = '"' + firstSentence.slice(0, 240) + (firstSentence.length > 240 ? '…' : '') + '"';
+    echo.classList.remove('hidden');
+  }
+  document.getElementById('card-confirmation').classList.remove('hidden');
+
+  // V3: Visitor briefing
+  const visitorBriefing = response && response.visitor_briefing ? String(response.visitor_briefing).trim() : '';
+  if (visitorBriefing.length > 0) {
+    document.getElementById('visitor-briefing-text').textContent = visitorBriefing;
+    document.getElementById('card-visitor-briefing').classList.remove('hidden');
+  }
+
+  // V3: Client patterns
+  const patterns = response && Array.isArray(response.selected_patterns) ? response.selected_patterns : [];
+  if (patterns.length > 0) {
+    const list = document.getElementById('patterns-list');
+    list.innerHTML = '';
+    patterns.forEach(p => {
+      if (typeof p === 'string' && p.trim().length > 0) {
+        const li = document.createElement('li');
+        li.textContent = p.trim();
+        list.appendChild(li);
+      }
+    });
+    if (list.children.length > 0) {
+      document.getElementById('card-patterns').classList.remove('hidden');
+    }
+  }
+
+  // V3: Situation page CTA
+  const url = response && response.situation_page_url ? String(response.situation_page_url).trim() : '/your-situation/';
+  const detected = response && response.scenario_detected ? String(response.scenario_detected).trim() : '';
+  if (url) {
+    const fullUrl = url.startsWith('http') ? url : 'https://thecyrteam.com' + url;
+    document.getElementById('cta-link').setAttribute('href', fullUrl);
+
+    // Friendlier text per scenario
+    const ctaText = ctaTextForScenario(detected);
+    document.getElementById('cta-text').textContent = ctaText;
+
+    document.getElementById('card-situation-cta').classList.remove('hidden');
+  }
+
+  STATE.stage = 'CONFIRMATION';
+}
+
+// Per-scenario "while you wait" text — softer than a generic "read more"
+function ctaTextForScenario(scenario) {
+  const map = {
+    'Divorce': 'More on how we approach selling during a divorce.',
+    'Estate': 'More on how we approach inherited and estate sales.',
+    'Downsizing': 'More on the downsizing transition.',
+    'Relocation': 'More on relocating to the area.',
+    'Moving Up': 'More on selling and buying at the same time.',
+    'First Time Buyer': 'More on buying your first home.',
+    'Luxury': 'More on distinctive and luxury home sales.',
+    'Buying': 'More on the situations we handle.',
+    'Selling': 'More on the situations we handle.',
+    'General Inquiry': 'More on the situations we handle.'
+  };
+  return map[scenario] || 'More on the situations we handle.';
+}
+
+</script>
+</body>
+</html>
