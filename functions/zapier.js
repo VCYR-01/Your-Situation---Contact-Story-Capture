@@ -37,6 +37,7 @@ const KEY_MAP = {
   referrer_page: 'referrerPage',
   refinement_count: 'refinementCount',
   pre_approved: 'preApproved',
+  timeline: 'Timeline',
   probe_asked: 'probeAsked',
   transcript: 'transcript',
   submitted_at: 'submittedAt',
