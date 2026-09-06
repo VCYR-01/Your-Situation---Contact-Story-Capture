@@ -790,6 +790,7 @@ class MicHandler {
       this.finalTranscript = this.transcriptBox.value || '';
       // Show transcript box during recording for visual reassurance
       this.transcriptBox.classList.remove('hidden');
+      this.transcriptBox.focus();
       // Show the hint while recording — names both actions ("tap mic again, then press Continue/Send it")
       if (this.hintEl) this.hintEl.classList.remove('hidden');
     };
@@ -839,6 +840,8 @@ class MicHandler {
         this.recognition.stop();
         this.stop();
       } else {
+        this.transcriptBox.classList.remove('hidden');
+        this.transcriptBox.focus();
         try { this.recognition.start(); } catch(e) {
           this.micStatus.textContent = 'Could not start — refresh and try again';
           this.micStatus.className = 'mic-status error';
@@ -1152,6 +1155,14 @@ function playChain(audios, index, onAllDone) {
   }
   const audio = audios[index];
   if (!audio) return playChain(audios, index + 1, onAllDone);
+  // Fully stop and release whatever was playing before, rather than just
+  // overwriting the reference — a lingering, not-fully-released previous
+  // clip appears to cause quieter/ducked playback on subsequent sequences.
+  if (currentAudio && currentAudio !== audio) {
+    currentAudio.pause();
+    currentAudio.src = '';
+  }
+  audio.volume = 1.0;
   currentAudio = audio;
   audio.onended = () => { playChain(audios, index + 1, onAllDone); };
   audio.onerror = () => { playChain(audios, index + 1, onAllDone); };
