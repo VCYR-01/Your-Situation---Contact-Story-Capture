@@ -540,6 +540,20 @@
     </div>
   </div>
 
+  <!-- ============ STAGE: CONTACT CAPTURE ============ -->
+  <div class="card hidden" id="card-contact">
+    <div class="card-label">Almost done</div>
+    <p style="margin-bottom:16px;">Where should we send this?</p>
+    <input type="tel" id="contact-phone" placeholder="Phone" style="width:100%; margin-bottom:10px; padding:10px; font-family:var(--mono);">
+    <input type="email" id="contact-email" placeholder="Email" style="width:100%; margin-bottom:16px; padding:10px; font-family:var(--mono);">
+    <div class="button-row">
+      <button class="btn btn-primary" id="btn-contact-submit">Send it →</button>
+    </div>
+    <p style="font-size:13px; color:var(--ink-light); text-align:center; margin-top:16px;">
+      <button id="btn-contact-optout" style="background:none; border:none; color:var(--accent); font-size:13px; font-family:var(--mono); cursor:pointer; text-decoration:underline; padding:0;">I'd rather not share contact info right now</button>
+    </p>
+  </div>
+
   <!-- ============ STAGE 3: PROBE CAPTURE ============ -->
   <div class="card hidden" id="card-probe">
     <div class="card-label">Quick follow-up</div>
@@ -632,6 +646,9 @@ const STATE = {
   paragraph: '',              // most recent paragraph from Claude
   probe: '',                  // the probe Claude generated
   permissionGranted: false,   // did visitor say "sure, ask"
+  contactPhone: null,         // captured at end-of-flow contact screen, not from Forminator
+  contactEmail: null,         // captured at end-of-flow contact screen, not from Forminator
+  contactOptedOut: false,     // visitor declined to share contact info
   refinementCount: 0,         // 0 or 1
   retryAttempts: 0,           // tier-1 retry counter
   pendingRetry: null,         // { fn: ..., context: ... } for retry
@@ -826,6 +843,7 @@ class MicHandler {
 // All cards managed by the stage system, including v3 confirmation supplements
 const ALL_CARDS = [
   'card-initial', 'card-playback', 'card-probe', 'card-loading',
+  'card-contact',
   'card-confirmation', 'card-visitor-briefing', 'card-patterns', 'card-situation-cta',
   'card-error-retry'
 ];
@@ -840,6 +858,7 @@ function showStage(stage) {
     PLAYBACK: 'card-playback',
     PROBE: 'card-probe',
     LOADING: 'card-loading',
+    CONTACT: 'card-contact',
     CONFIRMATION: 'card-confirmation',
     ERROR: 'card-error-retry'
   };
@@ -932,9 +951,10 @@ async function fireZapier(payload) {
 async function fireFallbackZapier(transcript) {
   const fallbackPayload = {
     name: confirmedName,
-    phone: confirmedPhone,
-    email: confirmedEmail,
+    phone: STATE.contactPhone || confirmedPhone,
+    email: STATE.contactEmail || confirmedEmail,
     scenario: confirmedScenario,
+    contact_provided: STATE.contactOptedOut ? 'No' : 'Yes',
     situation: 'unclear',
     area: null,
     price_range: null,
@@ -1055,9 +1075,27 @@ function showPlayback(response) {
 // STAGE 2 BRANCH: "I'M GOOD, SEND IT"
 // ═══════════════════════════════════════════════════════════════
 
+function showContactCapture() {
+  showStage('CONTACT');
+}
+
+document.getElementById('btn-contact-submit').addEventListener('click', async () => {
+  STATE.contactPhone = document.getElementById('contact-phone').value.trim() || null;
+  STATE.contactEmail = document.getElementById('contact-email').value.trim() || null;
+  STATE.contactOptedOut = false;
+  await finalizeAndSubmit();
+});
+
+document.getElementById('btn-contact-optout').addEventListener('click', async () => {
+  STATE.contactPhone = null;
+  STATE.contactEmail = null;
+  STATE.contactOptedOut = true;
+  await finalizeAndSubmit();
+});
+
 document.getElementById('btn-permission-no').addEventListener('click', async () => {
   STATE.permissionGranted = false;
-  await finalizeAndSubmit();
+  showContactCapture();
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -1181,7 +1219,7 @@ document.getElementById('btn-continue-probe').addEventListener('click', async ()
     //  "spoke-but-empty" flag — today the page can't distinguish silence from a tech failure.)
     STATE.round2Outcome = timerHadFired ? 'declined_timeout' : 'declined_explicit';
   }
-  await finalizeAndSubmit();
+  showContactCapture();
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -1240,9 +1278,10 @@ async function finalizeAndSubmit() {
     const payload = {
       // Form data
       name: confirmedName,
-      phone: confirmedPhone,
-      email: confirmedEmail,
+      phone: STATE.contactPhone || confirmedPhone,
+      email: STATE.contactEmail || confirmedEmail,
       scenario: confirmedScenario,
+      contact_provided: STATE.contactOptedOut ? 'No' : 'Yes',
 
       // Structured extraction (final state)
       situation: structured.situation || null,
