@@ -710,8 +710,25 @@ const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecogni
 // the ElevenLabs response comes back) won't play otherwise. Playing a
 // near-silent, near-zero-length audio clip here "unlocks" playback for
 // everything played later in this session.
+// TEMPORARY DEBUG — shows TTS status directly on screen since iPhone
+// console output isn't easily visible without a Mac + Web Inspector.
+// Remove this whole block once iOS playback is confirmed working.
+function ttsDebug(msg) {
+  let el = document.getElementById('tts-debug-banner');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'tts-debug-banner';
+    el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#000;color:#0f0;font-family:monospace;font-size:11px;padding:6px;z-index:9999;max-height:120px;overflow-y:auto;';
+    document.body.appendChild(el);
+  }
+  const line = document.createElement('div');
+  line.textContent = new Date().toLocaleTimeString() + ' — ' + msg;
+  el.appendChild(line);
+}
+
 function unlockTTS() {
-  if (window.__ttsUnlocked) return;
+  if (window.__ttsUnlocked) { ttsDebug('unlockTTS called, already unlocked'); return; }
+  ttsDebug('unlockTTS: attempting...');
   try {
     // Genuinely valid 100ms silent WAV (8-bit PCM, 8kHz mono) — a
     // zero-sample stub isn't reliably treated as real playback on iOS,
@@ -721,14 +738,14 @@ function unlockTTS() {
     const playPromise = silent.play();
     if (playPromise && typeof playPromise.then === 'function') {
       playPromise
-        .then(() => { window.__ttsUnlocked = true; })
-        .catch((err) => { console.warn('TTS unlock failed — playback may not work on this device', err); });
+        .then(() => { window.__ttsUnlocked = true; ttsDebug('unlock: SUCCESS'); })
+        .catch((err) => { ttsDebug('unlock FAILED: ' + err.name + ' — ' + err.message); });
     } else {
-      // Older browsers without a Promise-returning play() — assume it worked.
       window.__ttsUnlocked = true;
+      ttsDebug('unlock: assumed OK (no promise API)');
     }
   } catch (e) {
-    console.warn('TTS unlock threw', e);
+    ttsDebug('unlock THREW: ' + e.message);
   }
 }
 
@@ -1099,9 +1116,11 @@ let currentAudio = null;
 
 async function speakText(text, onEnd) {
   if (ttsMuted || !text) {
+    ttsDebug('speakText: skipped (muted=' + ttsMuted + ', hasText=' + !!text + ')');
     if (onEnd) onEnd();
     return;
   }
+  ttsDebug('speakText: fetching /api/tts (unlocked=' + !!window.__ttsUnlocked + ')');
   if (currentAudio) {
     currentAudio.pause();
     currentAudio = null;
@@ -1113,27 +1132,31 @@ async function speakText(text, onEnd) {
       body: JSON.stringify({ text }),
     });
     if (!response.ok) {
-      console.error('TTS request failed', response.status);
+      ttsDebug('speakText: /api/tts returned ' + response.status);
       if (onEnd) onEnd();
       return;
     }
     const data = await response.json();
+    ttsDebug('speakText: audio received, ' + (data.audio ? data.audio.length : 0) + ' b64 chars');
     const audio = new Audio('data:' + data.mime + ';base64,' + data.audio);
     currentAudio = audio;
     if (onEnd) audio.onended = onEnd;
-    audio.onerror = () => { if (onEnd) onEnd(); };
+    audio.onerror = (e) => { ttsDebug('audio element error: ' + JSON.stringify(e && e.target && e.target.error)); if (onEnd) onEnd(); };
     // Muted between request completing and playback starting — check again
     // in case the visitor hit mute while audio was generating.
     if (ttsMuted) {
+      ttsDebug('speakText: muted after fetch completed, aborting playback');
       if (onEnd) onEnd();
       return;
     }
-    audio.play().catch((err) => {
-      console.error('Audio playback failed', err);
+    audio.play().then(() => {
+      ttsDebug('audio.play(): SUCCESS');
+    }).catch((err) => {
+      ttsDebug('audio.play() FAILED: ' + err.name + ' — ' + err.message);
       if (onEnd) onEnd();
     });
   } catch (err) {
-    console.error('TTS proxy error', err);
+    ttsDebug('speakText THREW: ' + err.message);
     if (onEnd) onEnd();
   }
 }
