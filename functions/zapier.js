@@ -29,16 +29,28 @@ exports.handler = async (event) => {
     };
   }
 
+  // ---- DIAGNOSTIC: log exactly what Netlify handed us, before touching it ----
+  console.log('RAW event.body length:', event.body ? event.body.length : 'null/undefined');
+  console.log('RAW event.isBase64Encoded:', event.isBase64Encoded);
+  console.log('RAW event.body (first 500 chars):', (event.body || '').slice(0, 500));
+  // ---------------------------------------------------------------------------
+
   let body;
   try {
     body = JSON.parse(event.body || '{}');
   } catch (e) {
+    console.log('PARSE FAILED:', e.message);
     return {
       statusCode: 400,
       headers: { 'Access-Control-Allow-Origin': '*' },
       body: JSON.stringify({ error: 'Invalid JSON' }),
     };
   }
+
+  // ---- DIAGNOSTIC: log what we ended up with after parsing ----
+  console.log('PARSED body keys:', Object.keys(body));
+  console.log('PARSED body (first 500 chars):', JSON.stringify(body).slice(0, 500));
+  // ---------------------------------------------------------------
 
   try {
     const response = await fetch(ZAPIER_HOOK_URL, {
