@@ -1,13 +1,15 @@
 [build]
   publish = "."
   functions = "functions"
-
 [[redirects]]
   from = "/api/claude"
   to = "/.netlify/functions/claude"
   status = 200
-
 [[redirects]]
   from = "/api/zapier"
   to = "/.netlify/functions/zapier"
+  status = 200
+[[redirects]]
+  from = "/api/tts"
+  to = "/.netlify/functions/elevenlabs-tts"
   status = 200

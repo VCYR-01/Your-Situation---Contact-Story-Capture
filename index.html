@@ -705,18 +705,20 @@ if (confirmedName) {
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-// iOS Safari requires speech synthesis to be triggered by a direct user
-// gesture at least once per session — later async-triggered speech (after
-// the Claude response comes back) won't play otherwise. A near-silent
-// zero-length utterance here "unlocks" audio for everything spoken later.
+// iOS Safari requires <audio> playback to be triggered by a direct user
+// gesture at least once per session — later async-triggered playback (after
+// the ElevenLabs response comes back) won't play otherwise. Playing a
+// near-silent, near-zero-length audio clip here "unlocks" playback for
+// everything played later in this session.
 function unlockTTS() {
-  if (window.speechSynthesis && !window.__ttsUnlocked) {
+  if (!window.__ttsUnlocked) {
     try {
-      const unlock = new SpeechSynthesisUtterance('');
-      unlock.volume = 0;
-      window.speechSynthesis.speak(unlock);
+      // Minimal silent WAV, base64-encoded — no network request needed.
+      const silent = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=');
+      silent.volume = 0;
+      silent.play().catch(() => {});
       window.__ttsUnlocked = true;
-    } catch (e) { /* non-fatal — speech just won't work on this device */ }
+    } catch (e) { /* non-fatal — audio just won't work on this device */ }
   }
 }
 
@@ -1076,49 +1078,54 @@ async function processRound1() {
   }
 }
 
-// ---- SPEECH SYNTHESIS: reads the paragraph playback aloud ----
-// Uses the browser's built-in speechSynthesis — no API, no cost, no server
-// call. Voice availability varies by device/OS; this picks the best female-
-// sounding option from whatever the visitor's browser actually has installed,
-// falling back gracefully if none match.
+// ---- SPEECH: reads the paragraph playback aloud via ElevenLabs ----
+// Server-side proxy (functions/elevenlabs-tts.js) keeps the API key off
+// the client. Generation takes a few seconds — real latency, unlike the
+// old browser-native version. speakText(text, onEnd) keeps the same
+// interface as before so every call site (playback, confirmation
+// sequence) works unchanged.
 let ttsMuted = false;
-let ttsVoice = null;
+let currentAudio = null;
 
-function pickFemaleVoice() {
-  const voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
-  if (!voices.length) return null;
-  // Common female-voice names across platforms — checked in rough
-  // quality-preference order. Falls back to anything flagged female-ish
-  // by name pattern, then to the first available English voice, then null.
-  const preferredNames = ['Samantha', 'Google US English Female', 'Microsoft Zira', 'Victoria', 'Karen', 'Moira', 'Google UK English Female'];
-  for (const name of preferredNames) {
-    const match = voices.find(v => v.name.includes(name));
-    if (match) return match;
-  }
-  const looksFemale = voices.find(v => /female/i.test(v.name) && /en/i.test(v.lang));
-  if (looksFemale) return looksFemale;
-  const anyEnglish = voices.find(v => /^en/i.test(v.lang));
-  return anyEnglish || voices[0];
-}
-
-// Voice list loads asynchronously on some browsers — refresh the pick once ready.
-if (window.speechSynthesis) {
-  ttsVoice = pickFemaleVoice();
-  window.speechSynthesis.onvoiceschanged = () => { ttsVoice = pickFemaleVoice(); };
-}
-
-function speakText(text, onEnd) {
-  if (!window.speechSynthesis || ttsMuted || !text) {
+async function speakText(text, onEnd) {
+  if (ttsMuted || !text) {
     if (onEnd) onEnd();
     return;
   }
-  window.speechSynthesis.cancel(); // stop anything already playing
-  const utterance = new SpeechSynthesisUtterance(text);
-  if (ttsVoice) utterance.voice = ttsVoice;
-  utterance.rate = 1.0;
-  utterance.pitch = 1.0;
-  if (onEnd) utterance.onend = onEnd;
-  window.speechSynthesis.speak(utterance);
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+  }
+  try {
+    const response = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    if (!response.ok) {
+      console.error('TTS request failed', response.status);
+      if (onEnd) onEnd();
+      return;
+    }
+    const data = await response.json();
+    const audio = new Audio('data:' + data.mime + ';base64,' + data.audio);
+    currentAudio = audio;
+    if (onEnd) audio.onended = onEnd;
+    audio.onerror = () => { if (onEnd) onEnd(); };
+    // Muted between request completing and playback starting — check again
+    // in case the visitor hit mute while audio was generating.
+    if (ttsMuted) {
+      if (onEnd) onEnd();
+      return;
+    }
+    audio.play().catch((err) => {
+      console.error('Audio playback failed', err);
+      if (onEnd) onEnd();
+    });
+  } catch (err) {
+    console.error('TTS proxy error', err);
+    if (onEnd) onEnd();
+  }
 }
 
 const muteBtn = document.getElementById('btn-mute-toggle');
@@ -1126,10 +1133,14 @@ if (muteBtn) {
   muteBtn.addEventListener('click', () => {
     ttsMuted = !ttsMuted;
     muteBtn.textContent = ttsMuted ? '🔇 Unmute' : '🔊 Mute';
-    if (ttsMuted && window.speechSynthesis) window.speechSynthesis.cancel();
+    if (ttsMuted && currentAudio) {
+      currentAudio.pause();
+      currentAudio = null;
+    }
   });
 }
-// ---- END SPEECH SYNTHESIS ----
+// ---- END SPEECH ----
+
 
 function showPlayback(response) {
   document.getElementById('paragraph-playback').textContent = response.paragraph || '';
