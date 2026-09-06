@@ -5,7 +5,7 @@
 // the parent + child Airtable writes, the FUB note, and the SMS based on
 // whatever fields are present in the JSON body.
 
-const ZAPIER_HOOK_URL = 'https://hooks.zapier.com/hooks/catch/5383194/u7vprb7/';
+const ZAPIER_HOOK_URL = 'https://hooks.zapier.com/hooks/catch/5383194/4heg0ok/';
 
 exports.handler = async (event) => {
   // CORS preflight
