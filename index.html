@@ -849,6 +849,13 @@ class MicHandler {
         this.recognition.stop();
         this.stop();
       } else {
+        // Stop any AI speech that might still be playing (or just finished)
+        // before starting to listen — overlapping speaker output and mic
+        // input can cause the same kind of brief capture failure we saw
+        // on the very first recording of a session.
+        if (typeof sharedAudioEl !== 'undefined' && sharedAudioEl) {
+          sharedAudioEl.pause();
+        }
         this.transcriptBox.classList.remove('hidden');
         this.transcriptBox.focus();
         try { this.recognition.start(); } catch(e) {
@@ -1168,7 +1175,12 @@ function playChain(dataUrls, index, onAllDone) {
   const url = dataUrls[index];
   if (!url) return playChain(dataUrls, index + 1, onAllDone);
   const el = getSharedAudioEl();
-  el.onended = () => { playChain(dataUrls, index + 1, onAllDone); };
+  el.onended = () => {
+    // Brief pause before loading the next clip — swapping src immediately
+    // on 'ended' can trigger a fade/duck artifact in some browsers' audio
+    // pipelines, making the next clip start noticeably quieter.
+    setTimeout(() => { playChain(dataUrls, index + 1, onAllDone); }, 250);
+  };
   el.onerror = () => { playChain(dataUrls, index + 1, onAllDone); };
   el.volume = 1.0;
   el.src = url;
