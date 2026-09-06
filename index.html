@@ -835,7 +835,6 @@ class MicHandler {
     };
 
     this.micBtn.addEventListener('click', () => {
-      unlockTTS();
       if (this.isRecording) {
         this.recognition.stop();
         this.stop();
@@ -1083,6 +1082,7 @@ document.getElementById('btn-startover-initial').addEventListener('click', () =>
 });
 
 document.getElementById('btn-continue-initial').addEventListener('click', async () => {
+  unlockTTS();
   STATE.round1Transcript = micInitial.getTranscript();
   STATE.cumulativeTranscript = STATE.round1Transcript;
   await processRound1();
@@ -1347,6 +1347,7 @@ function showProbe() {
 }
 
 document.getElementById('btn-continue-probe').addEventListener('click', async () => {
+  unlockTTS();
   // v2.1: capture whether the timer had fired BEFORE we clear it — this is what
   // distinguishes an explicit skip from a timed-out one.
   const timerHadFired = probeButtonForceEnabled;
