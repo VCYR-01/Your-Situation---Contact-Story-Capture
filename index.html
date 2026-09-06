@@ -1178,6 +1178,12 @@ async function speakSequence(texts, buttonEl, onAllDone) {
   }
   ttsDebug('speakSequence: prefetching ' + texts.length + ' clip(s)');
   const audios = await Promise.all(texts.map(fetchAudioClip));
+  // Make failed clips visible instead of silently skipping them — a failed
+  // paragraph clip is the most important thing being said, not something
+  // to quietly drop without any sign it happened.
+  audios.forEach((a, i) => {
+    if (a === null) ttsDebug('speakSequence: clip ' + i + ' FAILED to load (text: "' + (texts[i] || '').slice(0, 40) + '...")');
+  });
   if (ttsMuted) { if (onAllDone) onAllDone(); return; } // re-check post-fetch
   const firstIdx = audios.findIndex(a => a !== null);
   if (firstIdx === -1) { if (onAllDone) onAllDone(); return; }
