@@ -728,20 +728,30 @@ function ttsDebug(msg) {
   el.appendChild(line);
 }
 
+// Single shared <audio> element, reused for the unlock clip AND every real
+// playback afterward. iOS Safari appears to tie its gesture-unlock state
+// to the specific element instance, not the page as a whole — a chained
+// clip played through a brand-new Audio() object (even after a successful
+// unlock elsewhere) can be treated as an entirely fresh, ungestured
+// attempt. Reusing one element throughout avoids that.
+let sharedAudioEl = null;
+function getSharedAudioEl() {
+  if (!sharedAudioEl) sharedAudioEl = new Audio();
+  return sharedAudioEl;
+}
+
 function unlockTTS() {
   if (window.__ttsUnlocked) { ttsDebug('unlockTTS called, already unlocked'); return; }
   ttsDebug('unlockTTS: attempting...');
   try {
+    const el = getSharedAudioEl();
     // Genuinely valid 100ms silent WAV (8-bit PCM, 8kHz mono) — a
-    // zero-sample stub isn't reliably treated as real playback on iOS,
-    // so the unlock could silently fail while still being marked done.
-    const silent = new Audio('data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSADAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==');
-    // No explicit volume=0 here — iOS's autoplay-unlock heuristic
-    // specifically requires audio to have played WITH sound to count as a
-    // valid unlock gesture. A silent WAV (constant mid-value samples) is
-    // already inaudible on its own; forcing element volume to 0 on top of
-    // that appears to make iOS not credit it as a real unlock at all.
-    const playPromise = silent.play();
+    // zero-sample stub isn't reliably treated as real playback on iOS.
+    // No explicit volume=0 — iOS's unlock heuristic wants audio that
+    // played WITH sound; the WAV's own silent samples make it inaudible
+    // without needing to force the element's volume down.
+    el.src = 'data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSADAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==';
+    const playPromise = el.play();
     if (playPromise && typeof playPromise.then === 'function') {
       playPromise
         .then(() => { window.__ttsUnlocked = true; ttsDebug('unlock: SUCCESS'); })
@@ -1138,35 +1148,32 @@ async function fetchAudioClip(text) {
       return null;
     }
     const data = await response.json();
-    return new Audio('data:' + data.mime + ';base64,' + data.audio);
+    return 'data:' + data.mime + ';base64,' + data.audio;
   } catch (err) {
     ttsDebug('fetchAudioClip THREW: ' + err.message);
     return null;
   }
 }
 
-// Plays audios[index] onward, chaining through onended. Returns the
-// Promise from the first play() call so callers can catch autoplay
-// rejection specifically.
-function playChain(audios, index, onAllDone) {
-  if (ttsMuted || index >= audios.length) {
+// Plays dataUrls[index] onward through the ONE shared audio element,
+// chaining via onended. Reusing the same element (rather than a fresh
+// Audio() per clip) matters specifically for iOS, where a chained clip
+// played through a brand-new element can be treated as an entirely
+// fresh, ungestured attempt even right after a successful unlock.
+function playChain(dataUrls, index, onAllDone) {
+  if (ttsMuted || index >= dataUrls.length) {
     if (onAllDone) onAllDone();
     return Promise.resolve();
   }
-  const audio = audios[index];
-  if (!audio) return playChain(audios, index + 1, onAllDone);
-  // Fully stop and release whatever was playing before, rather than just
-  // overwriting the reference — a lingering, not-fully-released previous
-  // clip appears to cause quieter/ducked playback on subsequent sequences.
-  if (currentAudio && currentAudio !== audio) {
-    currentAudio.pause();
-    currentAudio.src = '';
-  }
-  audio.volume = 1.0;
-  currentAudio = audio;
-  audio.onended = () => { playChain(audios, index + 1, onAllDone); };
-  audio.onerror = () => { playChain(audios, index + 1, onAllDone); };
-  return audio.play();
+  const url = dataUrls[index];
+  if (!url) return playChain(dataUrls, index + 1, onAllDone);
+  const el = getSharedAudioEl();
+  el.onended = () => { playChain(dataUrls, index + 1, onAllDone); };
+  el.onerror = () => { playChain(dataUrls, index + 1, onAllDone); };
+  el.volume = 1.0;
+  el.src = url;
+  currentAudio = el;
+  return el.play();
 }
 
 // Pre-fetches all clips for a stage, tries autoplay, falls back to a
