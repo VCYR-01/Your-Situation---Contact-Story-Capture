@@ -712,21 +712,7 @@ const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecogni
 // the ElevenLabs response comes back) won't play otherwise. Playing a
 // near-silent, near-zero-length audio clip here "unlocks" playback for
 // everything played later in this session.
-// TEMPORARY DEBUG — shows TTS status directly on screen since iPhone
-// console output isn't easily visible without a Mac + Web Inspector.
-// Remove this whole block once iOS playback is confirmed working.
-function ttsDebug(msg) {
-  let el = document.getElementById('tts-debug-banner');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'tts-debug-banner';
-    el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#000;color:#0f0;font-family:monospace;font-size:11px;padding:6px;z-index:9999;max-height:120px;overflow-y:auto;';
-    document.body.appendChild(el);
-  }
-  const line = document.createElement('div');
-  line.textContent = new Date().toLocaleTimeString() + ' — ' + msg;
-  el.appendChild(line);
-}
+function ttsDebug() { /* debug banner removed — no-op */ }
 
 // Single shared <audio> element, reused for the unlock clip AND every real
 // playback afterward. iOS Safari appears to tie its gesture-unlock state
