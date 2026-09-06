@@ -530,6 +530,7 @@
     <div class="card-label" id="playback-label">Here's what I'm hearing</div>
     <div class="paragraph-box" id="paragraph-playback"></div>
     <button id="btn-mute-toggle" style="background:none; border:none; color:var(--accent); font-size:12px; font-family:var(--mono); cursor:pointer; text-decoration:underline; padding:0; margin-top:6px;" aria-label="Mute audio">🔊 Mute</button>
+    <button id="btn-listen-playback" class="hidden" style="display:block; margin:10px auto 0; background:var(--accent); color:white; border:none; padding:8px 18px; border-radius:20px; font-size:13px; font-family:var(--mono); cursor:pointer;">🔊 Tap to hear this</button>
     <div class="permission-ask" id="permission-ask"></div>
     <div class="button-row" id="playback-actions">
       <button class="btn btn-primary" id="btn-permission-yes">Sure, ask</button>
@@ -590,6 +591,7 @@
       <div class="confirmation-echo hidden" id="confirm-echo"></div>
       <p class="confirmation-followup" id="confirm-followup">Vincent or Jane will be in touch personally —<br>usually within a few hours.</p>
       <p class="confirmation-callnote" id="confirm-callnote">Watch for a call from a (610) number — that's us.</p>
+      <button id="btn-listen-confirmation" class="hidden" style="display:block; margin:10px auto 0; background:var(--accent); color:white; border:none; padding:8px 18px; border-radius:20px; font-size:13px; font-family:var(--mono); cursor:pointer;">🔊 Tap to hear this</button>
     </div>
   </div>
 
@@ -1109,26 +1111,19 @@ async function processRound1() {
   }
 }
 
-// ---- SPEECH: reads the paragraph playback aloud via ElevenLabs ----
+// ---- SPEECH: reads text aloud via ElevenLabs, with an iOS-safe fallback ----
 // Server-side proxy (functions/elevenlabs-tts.js) keeps the API key off
-// the client. Generation takes a few seconds — real latency, unlike the
-// old browser-native version. speakText(text, onEnd) keeps the same
-// interface as before so every call site (playback, confirmation
-// sequence) works unchanged.
+// the client. iOS Safari's autoplay policy can reject play() calls that
+// happen too long after the original tap/gesture, regardless of an earlier
+// "unlock" — so audio for each stage is pre-fetched up front, autoplay is
+// attempted, and if that's rejected, a visible button appears that plays
+// the ALREADY-LOADED audio synchronously on tap (a real, immediate,
+// gesture-linked play() call, which iOS reliably allows).
 let ttsMuted = false;
 let currentAudio = null;
 
-async function speakText(text, onEnd) {
-  if (ttsMuted || !text) {
-    ttsDebug('speakText: skipped (muted=' + ttsMuted + ', hasText=' + !!text + ')');
-    if (onEnd) onEnd();
-    return;
-  }
-  ttsDebug('speakText: fetching /api/tts (unlocked=' + !!window.__ttsUnlocked + ')');
-  if (currentAudio) {
-    currentAudio.pause();
-    currentAudio = null;
-  }
+async function fetchAudioClip(text) {
+  if (!text) return null;
   try {
     const response = await fetch('/api/tts', {
       method: 'POST',
@@ -1136,33 +1131,62 @@ async function speakText(text, onEnd) {
       body: JSON.stringify({ text }),
     });
     if (!response.ok) {
-      ttsDebug('speakText: /api/tts returned ' + response.status);
-      if (onEnd) onEnd();
-      return;
+      ttsDebug('fetchAudioClip: /api/tts returned ' + response.status);
+      return null;
     }
     const data = await response.json();
-    ttsDebug('speakText: audio received, ' + (data.audio ? data.audio.length : 0) + ' b64 chars');
-    const audio = new Audio('data:' + data.mime + ';base64,' + data.audio);
-    currentAudio = audio;
-    if (onEnd) audio.onended = onEnd;
-    audio.onerror = (e) => { ttsDebug('audio element error: ' + JSON.stringify(e && e.target && e.target.error)); if (onEnd) onEnd(); };
-    // Muted between request completing and playback starting — check again
-    // in case the visitor hit mute while audio was generating.
-    if (ttsMuted) {
-      ttsDebug('speakText: muted after fetch completed, aborting playback');
-      if (onEnd) onEnd();
-      return;
-    }
-    audio.play().then(() => {
-      ttsDebug('audio.play(): SUCCESS');
-    }).catch((err) => {
-      ttsDebug('audio.play() FAILED: ' + err.name + ' — ' + err.message);
-      if (onEnd) onEnd();
-    });
+    return new Audio('data:' + data.mime + ';base64,' + data.audio);
   } catch (err) {
-    ttsDebug('speakText THREW: ' + err.message);
-    if (onEnd) onEnd();
+    ttsDebug('fetchAudioClip THREW: ' + err.message);
+    return null;
   }
+}
+
+// Plays audios[index] onward, chaining through onended. Returns the
+// Promise from the first play() call so callers can catch autoplay
+// rejection specifically.
+function playChain(audios, index, onAllDone) {
+  if (ttsMuted || index >= audios.length) {
+    if (onAllDone) onAllDone();
+    return Promise.resolve();
+  }
+  const audio = audios[index];
+  if (!audio) return playChain(audios, index + 1, onAllDone);
+  currentAudio = audio;
+  audio.onended = () => { playChain(audios, index + 1, onAllDone); };
+  audio.onerror = () => { playChain(audios, index + 1, onAllDone); };
+  return audio.play();
+}
+
+// Pre-fetches all clips for a stage, tries autoplay, falls back to a
+// tap-to-listen button on the already-loaded audio if autoplay is blocked.
+async function speakSequence(texts, buttonEl, onAllDone) {
+  if (ttsMuted || !texts || !texts.filter(Boolean).length) {
+    if (onAllDone) onAllDone();
+    return;
+  }
+  ttsDebug('speakSequence: prefetching ' + texts.length + ' clip(s)');
+  const audios = await Promise.all(texts.map(fetchAudioClip));
+  if (ttsMuted) { if (onAllDone) onAllDone(); return; } // re-check post-fetch
+  const firstIdx = audios.findIndex(a => a !== null);
+  if (firstIdx === -1) { if (onAllDone) onAllDone(); return; }
+
+  playChain(audios, firstIdx, onAllDone)
+    .then(() => {
+      ttsDebug('speakSequence: autoplay SUCCESS');
+      if (buttonEl) buttonEl.classList.add('hidden');
+    })
+    .catch((err) => {
+      ttsDebug('speakSequence: autoplay blocked (' + err.name + ') — showing tap-to-listen');
+      if (!buttonEl) { if (onAllDone) onAllDone(); return; }
+      buttonEl.classList.remove('hidden');
+      buttonEl.onclick = () => {
+        buttonEl.classList.add('hidden');
+        // Direct, synchronous play() call inside a real click handler —
+        // no async gap, so iOS treats this as genuinely gesture-linked.
+        playChain(audios, firstIdx, onAllDone);
+      };
+    });
 }
 
 const muteBtn = document.getElementById('btn-mute-toggle');
@@ -1183,12 +1207,7 @@ function showPlayback(response) {
   document.getElementById('paragraph-playback').textContent = response.paragraph || '';
   const permissionText = response.permission_ask || 'Mind if I ask one more thing before we hand off, or are you good?';
   document.getElementById('permission-ask').textContent = permissionText;
-  // Speak the paragraph, then the follow-up question once it genuinely
-  // finishes (not a guessed delay) — a brief pause between them so it
-  // doesn't read as one unbroken sentence.
-  speakText(response.paragraph || '', () => {
-    setTimeout(() => speakText(permissionText), 400);
-  });
+  speakSequence([response.paragraph || '', permissionText], document.getElementById('btn-listen-playback'));
   showStage('PLAYBACK');
 }
 
@@ -1503,20 +1522,13 @@ function showConfirmation(response) {
   document.getElementById('card-confirmation').classList.remove('hidden');
 
   // Speak the confirmation sequence: name greeting, then the echoed
-  // excerpt, then the followup message — each chained off the previous
-  // one actually finishing, not a guessed delay. Reads the followup text
-  // directly from the DOM rather than recomputing it, so it can't drift
-  // out of sync with whatever was actually set above (normal or opt-out).
+  // excerpt, then the followup message. Reads the followup text directly
+  // from the DOM rather than recomputing it, so it can't drift out of sync
+  // with whatever was actually set above (normal or opt-out).
   const followupEl = document.getElementById('confirm-followup');
   const followupText = followupEl ? followupEl.textContent.trim() : '';
   const nameGreeting = confirmedName ? ("You're all set, " + confirmedName + ".") : "You're all set.";
-  speakText(nameGreeting, () => {
-    setTimeout(() => {
-      speakText(echoText, () => {
-        setTimeout(() => speakText(followupText), 400);
-      });
-    }, 400);
-  });
+  speakSequence([nameGreeting, echoText, followupText], document.getElementById('btn-listen-confirmation'));
 
   // V3: Visitor briefing
   const visitorBriefing = response && response.visitor_briefing ? String(response.visitor_briefing).trim() : '';
