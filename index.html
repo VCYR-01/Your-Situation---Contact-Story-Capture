@@ -711,14 +711,24 @@ const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecogni
 // near-silent, near-zero-length audio clip here "unlocks" playback for
 // everything played later in this session.
 function unlockTTS() {
-  if (!window.__ttsUnlocked) {
-    try {
-      // Minimal silent WAV, base64-encoded — no network request needed.
-      const silent = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=');
-      silent.volume = 0;
-      silent.play().catch(() => {});
+  if (window.__ttsUnlocked) return;
+  try {
+    // Genuinely valid 100ms silent WAV (8-bit PCM, 8kHz mono) — a
+    // zero-sample stub isn't reliably treated as real playback on iOS,
+    // so the unlock could silently fail while still being marked done.
+    const silent = new Audio('data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSADAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==');
+    silent.volume = 0;
+    const playPromise = silent.play();
+    if (playPromise && typeof playPromise.then === 'function') {
+      playPromise
+        .then(() => { window.__ttsUnlocked = true; })
+        .catch((err) => { console.warn('TTS unlock failed — playback may not work on this device', err); });
+    } else {
+      // Older browsers without a Promise-returning play() — assume it worked.
       window.__ttsUnlocked = true;
-    } catch (e) { /* non-fatal — audio just won't work on this device */ }
+    }
+  } catch (e) {
+    console.warn('TTS unlock threw', e);
   }
 }
 
