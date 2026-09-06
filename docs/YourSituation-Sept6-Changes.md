@@ -103,11 +103,74 @@ Confirmed directly: Lead Capture's Email field isn't an arbitrary required setti
 - **Visual redesign of the contact-capture screen** — currently plain unstyled inputs. Discussed replacing the mic icon elsewhere in the flow with an orb/waveform visual; not started.
 - **Retiring the old Zaps** — both are toggled off, not deleted. Fine to leave as-is; deleting is optional cleanup, not urgent.
 - **Full `KEY_MAP` audit** (see §5) — do this before the next time a new field is added anywhere in the Zap.
-- **Walther's missing Airtable record** — unrelated pre-existing gap, discovered while cross-referencing arrivals data; still unresolved, tracked separately in `[[aeo-lead-conversion]]`.
+---
+
+## 7. Voice/visual redesign (later same day)
+
+Separate work, done after §1–7 above and after the front-gate/Zap rebuild was confirmed live. Two parts: a visual redesign of the recording control, and adding spoken audio to the conversation.
+
+### 7.1 Visual: mic icon → glowing orb
+
+Original design was a plain white circle with a static mic SVG icon, bordered in the brand accent color. Replaced in two iterations:
+
+1. **First pass** — kept the circular button, replaced the static SVG with 5 animated waveform bars (still, then pulsing while recording). Abandoned in favor of iteration 2 once Vince clarified the actual direction he wanted.
+2. **Final version** — a pure CSS "ambient orb": no icon at all, a soft radial-gradient glow using the existing `--accent` brand color (not the blue in Vince's reference image — kept on-brand deliberately), gently "breathing" (subtle scale/glow pulse) at idle, brighter and faster-pulsing while recording. Matches the intended feel of "the AI has a presence," not "here's a recording button."
+   - All visitor-facing copy referencing "the mic" was updated to "the orb" in the same pass (`Tap the mic and tell us...` → `Tap the orb and tell us...`, plus both hint-text strings). This was originally missed in the first deploy and caught live — always update copy in the same pass as a control's visual identity changes, not as an afterthought.
+
+### 7.2 Voice: reading the conversation aloud
+
+Two implementations, in order:
+
+**v1 — Browser-native `speechSynthesis`.** Free, no server call, but voice quality/availability is fully device-dependent (decent on iOS/Mac via Apple's built-in voices, more robotic elsewhere) and there's no way to guarantee a consistent brand voice across visitors. Worked, sounded "a little robotic" per live test — judged good enough to ship at the time, but superseded same day once Vince decided to try ElevenLabs instead, since the practice already uses ElevenLabs elsewhere.
+
+**v2 — ElevenLabs (final).** Voice: `hpp4J3VqNfWAUOO0d1Us` (a Matilda-family voice — Vince supplied this ID directly from his own account after an initial third-party-sourced ID was tried first).
+
+Architecture:
+- New Netlify function `functions/elevenlabs-tts.js` — takes `{ text }`, calls ElevenLabs server-side (API key never touches the client), returns base64 MP3. Caps input at 2000 characters defensively. Uses `eleven_turbo_v2_5` for speed/cost; `eleven_multilingual_v2` noted in-code as the swap if quality ever needs to outweigh latency.
+- New `netlify.toml` redirect: `/api/tts` → `/.netlify/functions/elevenlabs-tts`.
+- New required env var: `ELEVENLABS_API_KEY` (Netlify site settings). **Env vars only take effect on the next deploy** — this cost real debugging time when the key was added but the site wasn't redeployed afterward.
+- `index.html`: what's spoken —
+  1. Playback stage: the paragraph, then the permission-ask follow-up question.
+  2. Confirmation screen: name greeting → echoed excerpt → followup line (the followup line's text is read directly from the DOM element that was already set, rather than recomputed, so opt-out vs. normal visitors each hear the message that actually matches what's on their screen).
+
+### 7.3 Bugs found and fixed, in the order they surfaced
+
+This was the hardest part of the day's build — a chain of real, distinct iOS Safari issues, each one looking at first like it might be the same problem as the last but each requiring its own fix. Worth reading in order if this resurfaces, since a fix that looks similar to an earlier one may not be the same root cause.
+
+1. **Playback worked on desktop, completely silent on iPhone.** Root cause: iOS Safari requires audio playback to be triggered by a direct user gesture at least once per session — the code was calling playback asynchronously, several steps removed from any tap (after a Claude API round-trip). Fix (first attempt): an "unlock" — play a near-silent clip directly inside a real click handler once, hoping it would permit later un-gestured playback for the rest of the session.
+
+2. **Unlock "succeeded" (per its own success callback) but real playback still failed.** Root cause, once diagnosed via an on-screen debug banner (iPhone has no easy console access without a Mac + Web Inspector): the first unlock attempt used a **zero-sample** WAV — invalid enough that iOS may not have credited it as genuine playback at all. Fixed with a real, valid 100ms silent WAV instead of an empty stub.
+
+3. **Still failed after that fix**, with an explicit `NotAllowedError`. Second real cause: the unlock clip was played at `volume = 0`. iOS's autoplay-unlock heuristic appears to specifically require audio that played **with sound** to count as a valid unlock gesture — a technically-successful but silent (zero-volume) playback may not satisfy it. Fixed by removing the explicit `volume = 0` and relying on the WAV's own silent sample data (constant mid-value amplitude) to be inaudible without telling the browser the volume was intentionally zero.
+
+4. **Still failed.** This was the point at which chasing more "unlock trick" variations was abandoned as the wrong approach entirely, in favor of a UX-level fix: **pre-fetch all audio for a stage up front, attempt autoplay, and if that's rejected, reveal a visible "🔊 Tap to hear this" button that plays the *already-loaded* clip synchronously on tap** — a genuinely direct, zero-async-gap gesture, which is what iOS reliably honors. This is the mechanism that actually shipped (`speakSequence()` / `playChain()` in `index.html`).
+
+5. **First clip of a sequence played via the tap-to-listen button; the second (chained) clip in the same sequence did not.** Root cause: each clip was a separate `new Audio()` object; iOS appears to tie its "blessed" gesture permission to the *specific element instance* that was tapped, not the page/session as a whole — a second, different `Audio()` object triggered automatically from the first one's `onended` event was treated as an entirely fresh, ungestured attempt. Fixed by refactoring to use **one single shared `<audio>` element** for the unlock clip and every real playback clip, changing only its `.src` for each new piece of audio rather than constructing new elements.
+
+6. **A specific clip in a sequence silently never played, with no visible sign anything had failed** — `playChain()`'s null-skip logic quietly moved on to the next clip if one failed to fetch. Fixed by having `speakSequence()` explicitly log (via the debug banner, at the time) which clip index failed and what text it corresponded to, so a failure is never silently invisible.
+
+7. **Volume audibly quieter on the second clip in a chained sequence**, even after the shared-element fix. Cause: rapidly swapping `.src` on the shared element the instant the previous clip's `onended` fires can trigger a fade/duck artifact in the browser's audio pipeline. Fixed with a brief (250ms) pause before loading and playing the next clip.
+
+8. **On the very first recording of a session, speech-to-text would stop capturing after about 1 second, requiring a retry — every attempt after the first worked fine.** Cause: the original `unlockTTS()` call was placed at the very top of the mic button's click handler, meaning the very first tap of a session did two audio-subsystem things at once — played the (real, if silent) unlock clip AND started `SpeechRecognition` capture, in the same instant. Audio playback and microphone capture competing for the same subsystem caused the brief capture interruption. Fixed by moving the `unlockTTS()` call entirely out of the mic button and onto the **Continue / Send it** buttons instead — a gesture that fires *after* recording has already stopped, so there's no competition. (This also explains why only the *first* tap was ever affected: once unlocked, every later tap skips the unlock's audio-playing step entirely.)
+
+9. **Speech-to-text on the probe (second) recording occasionally needed two taps to hold.** Related to the same class of problem as #8: if the AI's own spoken audio (paragraph/permission-ask) was still playing or had only just finished when the visitor tapped to record their answer, overlapping speaker output and microphone input could cause the same kind of brief capture failure. Fixed by explicitly pausing the shared audio element the instant a new recording starts, in the mic button's click handler.
+
+10. **Voice capture didn't reliably work on the orb tap at all, independent of the above.** The transcript textarea was being *shown* on recording start but never *focused*. iOS Safari's speech-input handling has historically been less consistent than desktop Chrome's Web Speech API and may depend on the target field being focused. Fixed by explicitly calling `.focus()` on the transcript box both immediately in the click handler and again once recognition's `onstart` fires. **Known tradeoff, not yet resolved**: focusing a text field on mobile will likely pop up the on-screen keyboard, which may visually clash with a voice-first interface. Worth watching in real use — if it feels wrong, the fix is to focus briefly then `.blur()` immediately after, rather than leaving focus (and the keyboard) engaged for the whole recording.
+
+### 7.4 Two smaller, unrelated fixes made in the same session
+
+- **Forminator's own inline "Thank you" success message was flashing on screen** for a fraction of a second before the JS redirect to YourSituation took over. Fixed by having the WPCode snippet hide every known form wrapper by ID the instant the redirect logic fires, before anything else — so Forminator's own message never gets a chance to paint.
+- **Debug instrumentation removed.** A temporary on-screen black debug banner (`ttsDebug()`) was added specifically to diagnose the iOS issues above, since iPhone has no easy console access without a Mac. Once all the issues were resolved, `ttsDebug()` was turned into a no-op rather than deleting all ~16 scattered call sites individually — functionally equivalent to full removal (nothing logs, nothing renders, ever) but the inert calls still exist in the source if someone reads the code closely. Full line-by-line removal was offered and explicitly declined.
+
+### 7.5 Known open items from this section
+
+- **"You're all set, Jane" (the confirmation greeting) reads slightly oddly** — noted in live testing, left as-is deliberately. Likely cause: it's a very short, isolated phrase, and ElevenLabs models can read short clips with less natural pacing than longer sentences with more context. Not chased further; revisit only if it becomes a recurring complaint.
+- **The mobile-keyboard-on-focus tradeoff from #10 above** is unresolved — works, but may need the focus-then-blur refinement if it feels intrusive in practice.
+- Voice ID `hpp4J3VqNfWAUOO0d1Us` was supplied directly by Vince from his own ElevenLabs account — not independently verified against ElevenLabs' own documentation the way the model registry setup was. If this voice is ever deprecated or renamed on ElevenLabs' end, the fix is a one-line change to `VOICE_ID` in `functions/elevenlabs-tts.js`.
 
 ---
 
-## 7. Git migration (side effect of today's work)
+## 8. Git migration (happened earlier in the same day, before the voice/visual work in §7)
 
 YourSituation moved from manual Netlify drag-and-drop deploys to a GitHub-connected auto-deploy, matching the rest of the fleet.
 
