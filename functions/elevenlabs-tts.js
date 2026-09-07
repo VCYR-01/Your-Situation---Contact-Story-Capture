@@ -3,7 +3,7 @@
 // Takes { text } in the POST body, calls ElevenLabs server-side (keeping
 // the API key off the client), returns base64-encoded MP3 audio.
 
-const VOICE_ID = 'hpp4J3VqNfWAUOO0d1Us';
+const VOICE_ID = 'DXFkLCBUTmvXpp2QwZjA';
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
