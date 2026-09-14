@@ -542,8 +542,10 @@
   <div class="card hidden" id="card-contact">
     <div class="card-label">Almost done</div>
     <p style="margin-bottom:16px;">Where should we send this?</p>
-    <input type="tel" id="contact-phone" placeholder="Phone" style="width:100%; margin-bottom:10px; padding:10px; font-family:var(--mono);">
-    <input type="email" id="contact-email" placeholder="Email" style="width:100%; margin-bottom:16px; padding:10px; font-family:var(--mono);">
+    <input type="tel" id="contact-phone" placeholder="Phone" style="width:100%; margin-bottom:4px; padding:10px; font-family:var(--mono);">
+    <p class="hint-text hidden" id="contact-phone-error" style="color:var(--warn); font-size:12px; margin-bottom:10px;">Please enter a phone number.</p>
+    <input type="email" id="contact-email" placeholder="Email" style="width:100%; margin-bottom:4px; padding:10px; font-family:var(--mono);">
+    <p class="hint-text hidden" id="contact-email-error" style="color:var(--warn); font-size:12px; margin-bottom:16px;">Please enter an email address.</p>
     <div class="button-row">
       <button class="btn btn-primary" id="btn-contact-submit">Send it →</button>
     </div>
@@ -1241,9 +1243,49 @@ function showContactCapture() {
   showStage('CONTACT');
 }
 
+function isValidPhone(raw) {
+  const digits = raw.replace(/\D/g, '');
+  const normalized = (digits.length === 11 && digits.startsWith('1')) ? digits.slice(1) : digits;
+  if (normalized.length !== 10) return false;
+  if (/^(\d)\1{9}$/.test(normalized)) return false; // e.g. 0000000000, 1111111111
+  return true;
+}
+
+function isValidEmail(raw) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw);
+}
+
 document.getElementById('btn-contact-submit').addEventListener('click', async () => {
-  STATE.contactPhone = document.getElementById('contact-phone').value.trim() || null;
-  STATE.contactEmail = document.getElementById('contact-email').value.trim() || null;
+  const phoneEl = document.getElementById('contact-phone');
+  const emailEl = document.getElementById('contact-email');
+  const phoneErrEl = document.getElementById('contact-phone-error');
+  const emailErrEl = document.getElementById('contact-email-error');
+  const phoneVal = phoneEl.value.trim();
+  const emailVal = emailEl.value.trim();
+
+  const phoneOk = phoneVal.length > 0 && isValidPhone(phoneVal);
+  const emailOk = emailVal.length > 0 && isValidEmail(emailVal);
+
+  if (phoneVal.length === 0) {
+    phoneErrEl.textContent = 'Please enter a phone number.';
+  } else if (!phoneOk) {
+    phoneErrEl.textContent = 'That doesn\'t look like a valid phone number.';
+  }
+  if (emailVal.length === 0) {
+    emailErrEl.textContent = 'Please enter an email address.';
+  } else if (!emailOk) {
+    emailErrEl.textContent = 'That doesn\'t look like a valid email address.';
+  }
+  phoneErrEl.classList.toggle('hidden', phoneOk);
+  emailErrEl.classList.toggle('hidden', emailOk);
+
+  if (!phoneOk || !emailOk) {
+    (phoneOk ? emailEl : phoneEl).focus();
+    return;
+  }
+
+  STATE.contactPhone = phoneVal;
+  STATE.contactEmail = emailVal;
   STATE.contactOptedOut = false;
   await finalizeAndSubmit();
 });
