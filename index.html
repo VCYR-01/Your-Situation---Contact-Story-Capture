@@ -506,8 +506,8 @@
   <div class="card" id="card-initial">
     <div class="card-label">Your story</div>
     <p style="font-size:14px; color:var(--ink-mid); margin-bottom:20px; line-height:1.6;">
-      Tap the orb and tell us what's going on — buying, selling, your timeline, whatever matters.
-      Speak naturally, take your time. Tap again when you're done.
+      Tell us what's going on — buying, selling, your timeline, whatever matters.
+      Tap the orb to speak, or type it instead. Take your time.
     </p>
     <div class="mic-area">
       <button class="mic-btn" id="mic-btn-initial" title="Tap to speak" aria-label="Start recording"></button>
@@ -515,9 +515,9 @@
     </div>
     <p style="font-size:13px; color:var(--ink-light); text-align:center; margin-top:20px;">
       Prefer to type?
-      <button id="type-toggle-initial" style="background:none; border:none; color:var(--accent); font-size:13px; font-family:var(--mono); cursor:pointer; text-decoration:underline; padding:0;">That works too.</button>
+      <button id="type-toggle-initial" style="background:none; border:none; color:var(--accent); font-size:13px; font-family:var(--mono); cursor:pointer; text-decoration:underline; padding:0;" aria-label="Type instead of speaking">Type instead</button>
     </p>
-    <textarea class="transcript-box hidden" id="transcript-initial" placeholder=""></textarea>
+    <textarea class="transcript-box hidden" id="transcript-initial" placeholder="Type your story here" aria-label="Your story"></textarea>
     <p class="hint-text hidden" id="hint-initial">Tap the orb again when you're done, and then press Continue below.</p>
     <div class="button-row" style="margin-top:18px;" id="initial-actions" >
       <button class="btn btn-primary" id="btn-continue-initial" disabled>Continue →</button>
@@ -566,9 +566,9 @@
     </div>
     <p style="font-size:13px; color:var(--ink-light); text-align:center; margin-top:20px;">
       Prefer to type?
-      <button id="type-toggle-probe" style="background:none; border:none; color:var(--accent); font-size:13px; font-family:var(--mono); cursor:pointer; text-decoration:underline; padding:0;">That works too.</button>
+      <button id="type-toggle-probe" style="background:none; border:none; color:var(--accent); font-size:13px; font-family:var(--mono); cursor:pointer; text-decoration:underline; padding:0;" aria-label="Type instead of speaking">Type instead</button>
     </p>
-    <textarea class="transcript-box hidden" id="transcript-probe" placeholder=""></textarea>
+    <textarea class="transcript-box hidden" id="transcript-probe" placeholder="Type your answer here" aria-label="Your answer"></textarea>
     <p class="hint-text hidden" id="hint-probe">Tap the orb again when you're done, and then press Send it below.</p>
     <div class="button-row" style="margin-top:18px;">
       <button class="btn btn-primary" id="btn-continue-probe" disabled>Send it →</button>
@@ -1078,8 +1078,10 @@ document.getElementById('type-toggle-initial').addEventListener('click', () => {
   const tb = document.getElementById('transcript-initial');
   tb.classList.remove('hidden');
   tb.focus();
-  // Type-only path: show the hint so they know about Continue
-  document.getElementById('hint-initial').classList.remove('hidden');
+  // Type-only path: show the hint so they know about Continue (typing-specific wording)
+  const hi = document.getElementById('hint-initial');
+  hi.textContent = 'Press Continue below when you\'re done.';
+  hi.classList.remove('hidden');
 });
 
 document.getElementById('btn-startover-initial').addEventListener('click', () => {
@@ -1382,8 +1384,10 @@ document.getElementById('type-toggle-probe').addEventListener('click', () => {
   const tb = document.getElementById('transcript-probe');
   tb.classList.remove('hidden');
   tb.focus();
-  // Type-only path: show the hint
-  document.getElementById('hint-probe').classList.remove('hidden');
+  // Type-only path: show the hint (typing-specific wording)
+  const hp = document.getElementById('hint-probe');
+  hp.textContent = 'Press Send it below when you\'re done.';
+  hp.classList.remove('hidden');
 });
 
 function showProbe() {
