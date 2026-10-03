@@ -506,7 +506,7 @@
   <div class="card" id="card-initial">
     <div class="card-label">Your story</div>
     <p style="font-size:14px; color:var(--ink-mid); margin-bottom:20px; line-height:1.6;">
-      Tell us what's going on — buying, selling, your timeline, whatever matters.
+      Buying, selling, your timeline, whatever matters.
       Tap the orb to speak, or type it instead. Take your time.
     </p>
     <div class="mic-area">
@@ -536,11 +536,15 @@
       <button class="btn btn-primary" id="btn-permission-yes">Sure, ask</button>
       <button class="btn btn-ghost" id="btn-permission-no">I'm good, send it</button>
     </div>
+    <p style="text-align:center; margin-top:14px;">
+      <button id="btn-fix-summary" style="background:none; border:none; color:var(--accent); font-size:13px; font-family:var(--mono); cursor:pointer; text-decoration:underline; padding:0;" aria-label="Something's off — go back and fix your story">Something's off? Fix it</button>
+    </p>
   </div>
 
   <!-- ============ STAGE: CONTACT CAPTURE ============ -->
   <div class="card hidden" id="card-contact">
     <div class="card-label">Almost done</div>
+    <p class="hidden" id="contact-ack" style="margin-bottom:8px; color:var(--accent);">Thanks — we've added that to your story.</p>
     <p style="margin-bottom:16px;">Where should we send this?</p>
     <input type="tel" id="contact-phone" placeholder="Phone" style="width:100%; margin-bottom:4px; padding:10px; font-family:var(--mono);">
     <p class="hint-text hidden" id="contact-phone-error" style="color:var(--warn); font-size:12px; margin-bottom:10px;">Please enter a phone number.</p>
@@ -1237,11 +1241,28 @@ function showPlayback(response) {
   showStage('PLAYBACK');
 }
 
+// Correction path: back to the story with their own words prefilled, so they can fix what we got wrong
+document.getElementById('btn-fix-summary').addEventListener('click', () => {
+  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+  const tb = document.getElementById('transcript-initial');
+  tb.value = STATE.round1Transcript;
+  tb.classList.remove('hidden');
+  micInitial.finalTranscript = tb.value;
+  document.getElementById('btn-continue-initial').disabled = micInitial.getTranscript().length < 5;
+  const hi = document.getElementById('hint-initial');
+  hi.textContent = 'Fix anything we got wrong, then press Continue.';
+  hi.classList.remove('hidden');
+  showStage('INITIAL');
+  tb.focus();
+});
+
 // ═══════════════════════════════════════════════════════════════
 // STAGE 2 BRANCH: "I'M GOOD, SEND IT"
 // ═══════════════════════════════════════════════════════════════
 
-function showContactCapture() {
+function showContactCapture(answeredFollowUp) {
+  // Acknowledge a follow-up answer before asking for contact info
+  document.getElementById('contact-ack').classList.toggle('hidden', !answeredFollowUp);
   showStage('CONTACT');
 }
 
@@ -1429,7 +1450,7 @@ document.getElementById('btn-continue-probe').addEventListener('click', async ()
     //  "spoke-but-empty" flag — today the page can't distinguish silence from a tech failure.)
     STATE.round2Outcome = timerHadFired ? 'declined_timeout' : 'declined_explicit';
   }
-  showContactCapture();
+  showContactCapture(STATE.round2Outcome === 'answered');
 });
 
 // ═══════════════════════════════════════════════════════════════
