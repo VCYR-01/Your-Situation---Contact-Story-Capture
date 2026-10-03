@@ -787,7 +787,7 @@ class MicHandler {
     this.recognition.onstart = () => {
       this.isRecording = true;
       this.micBtn.classList.add('recording');
-      this.micStatus.textContent = 'Listening... tap again to stop';
+      this.micStatus.textContent = "I'm listening — take your time. Tap again when you're done.";
       this.micStatus.className = 'mic-status recording';
       this.finalTranscript = this.transcriptBox.value || '';
       // Show transcript box during recording for visual reassurance
